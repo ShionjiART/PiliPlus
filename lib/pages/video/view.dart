@@ -1,8 +1,13 @@
+import 'dart:async';
 import 'dart:io' show Platform;
 import 'dart:math';
 
+import 'package:flutter/rendering.dart'
+    show RenderBox, RenderObject, RenderView;
+
 import 'package:PiliPlus/common/assets.dart';
 import 'package:PiliPlus/common/style.dart';
+import 'package:PiliPlus/common/widgets/view_safe_area.dart';
 import 'package:PiliPlus/common/widgets/custom_icon.dart';
 import 'package:PiliPlus/common/widgets/flutter/pop_scope.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
@@ -48,6 +53,7 @@ import 'package:PiliPlus/pages/video/reply/view.dart';
 import 'package:PiliPlus/pages/video/view_point/view.dart';
 import 'package:PiliPlus/pages/video/widgets/header_control.dart';
 import 'package:PiliPlus/pages/video/widgets/intro_layout.dart';
+import 'package:PiliPlus/pages/video/widgets/inner_video_split_layout.dart';
 import 'package:PiliPlus/pages/video/widgets/player_focus.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/models/fullscreen_mode.dart';
@@ -58,6 +64,11 @@ import 'package:PiliPlus/plugin/pl_player/view/view.dart';
 import 'package:PiliPlus/services/service_locator.dart';
 import 'package:PiliPlus/services/shutdown_timer_service.dart'
     show shutdownTimerService;
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+import 'package:PiliPlus/utils/ios/native_page_actions.dart';
+import 'package:PiliPlus/utils/ios/foldable_helper.dart';
+import 'package:PiliPlus/utils/device_utils.dart';
+import 'package:PiliPlus/pages/video/widgets/video_detail_body_insets.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/android/bindings.g.dart';
 import 'package:PiliPlus/utils/extension/scroll_controller_ext.dart';
@@ -70,6 +81,7 @@ import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
+import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/theme_utils.dart';
 import 'package:extended_nested_scroll_view/extended_nested_scroll_view.dart';
 import 'package:flutter/foundation.dart' show kDebugMode, clampDouble;
@@ -79,14 +91,36 @@ import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:screen_brightness_platform_interface/screen_brightness_platform_interface.dart';
 
-class VideoDetailPageV extends StatefulWidget {
+class VideoDetailPageV extends StatelessWidget {
   const VideoDetailPageV({super.key});
 
   @override
-  State<VideoDetailPageV> createState() => _VideoDetailPageVState();
+  Widget build(BuildContext context) {
+    final rawInsets = IOSNativeTabBar.safeArea.value;
+    final hasSideBar =
+        (rawInsets?.right ?? 0) >= 72 ||
+        (rawInsets?.left ?? 0) >= 72 ||
+        IOSNativeTabBar.usesNativeVideoNavigation(context);
+    return ValueListenableBuilder<bool>(
+      valueListenable: IOSNativeTabBar.playerFullScreen,
+      builder: (context, fullScreen, child) => StableVideoViewport(
+        enabled: IOSFoldableHelper.isIPhone && hasSideBar && !fullScreen,
+        windowSize: MediaQuery.sizeOf(context),
+        child: child!,
+      ),
+      child: const _VideoDetailPageContent(),
+    );
+  }
 }
 
-class _VideoDetailPageVState extends State<VideoDetailPageV>
+class _VideoDetailPageContent extends StatefulWidget {
+  const _VideoDetailPageContent();
+
+  @override
+  State<_VideoDetailPageContent> createState() => _VideoDetailPageVState();
+}
+
+class _VideoDetailPageVState extends State<_VideoDetailPageContent>
     with RouteAware, RouteAwareMixin, WidgetsBindingObserver {
   final heroTag = Get.arguments['heroTag'];
 
@@ -131,7 +165,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
 
   bool get _shouldShowSeasonPanel {
     if (videoDetailController.isFileSource ||
-        isPortrait ||
+        (isPortrait && !_usesInnerSplitLayout) ||
         !videoDetailController.plPlayerController.horizontalSeasonPanel) {
       return false;
     }
@@ -149,7 +183,20 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
   void initState() {
     super.initState();
 
+    _innerLayoutSubscription = GStorage.setting
+        .watch(key: SettingBoxKey.innerVideoDetailLayout)
+        .listen((_) {
+          if (mounted) setState(() {});
+        });
+
     videoDetailController = Get.put(VideoDetailController(), tag: heroTag);
+    final player = videoDetailController.plPlayerController;
+    _nativeVideoWorker = everAll([
+      player.showControls,
+      player.controlsLock,
+      player.isFullScreen,
+      videoDetailController.videoState,
+    ], (_) => _updateVerticalBar());
 
     introController = _initIntroCtr();
 
@@ -223,6 +270,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
 
   // 播放器状态监听
   Future<void> playerListener(PlayerStatus status) async {
+    _updateVerticalBar();
     final isPlaying = status.isPlaying;
     try {
       if (videoDetailController.scrollCtr.hasClients) {
@@ -339,6 +387,11 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
 
   @override
   void dispose() {
+    _innerLayoutSubscription?.cancel();
+    _nativeVideoWorker?.dispose();
+    if (_nativeVideoRoute case final route?) {
+      IOSNativeTabBar.removePageActions(route);
+    }
     plPlayerController
       ?..removeStatusLister(playerListener)
       ..removePositionListener(positionListener);
@@ -375,10 +428,154 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     super.dispose();
   }
 
+  bool _isOnTop = false;
+  Worker? _nativeVideoWorker;
+  ModalRoute<dynamic>? _nativeVideoRoute;
+  bool _nativeVideoUpdateScheduled = false;
+  bool _nativeVideoGeometryScheduled = false;
+  final _nativeVideoBoundsKey = GlobalKey();
+  Map<String, double>? _nativeVideoFrame;
+  bool _nativeVideoCollapsed = false;
+
+  void _onNativeVideoCollapsed(bool collapsed) {
+    if (!mounted || _nativeVideoCollapsed == collapsed) return;
+    _nativeVideoCollapsed = collapsed;
+    _updateVerticalBar();
+  }
+
+  void _watchNativeVideoGeometry() {
+    if (_nativeVideoGeometryScheduled || !mounted) return;
+    _nativeVideoGeometryScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _nativeVideoGeometryScheduled = false;
+      if (!mounted || !(_nativeVideoRoute?.isCurrent ?? false)) return;
+      final box = _nativeVideoBoundsKey.currentContext?.findRenderObject();
+      Map<String, double>? frame;
+      if (box is RenderBox && box.attached && box.hasSize) {
+        var root = box as RenderObject;
+        while (root.parent != null) {
+          root = root.parent!;
+        }
+        if (root is RenderView && !root.size.isEmpty) {
+          final rect = (box.localToGlobal(Offset.zero) & box.size).intersect(
+            Offset.zero & root.size,
+          );
+          if (!rect.isEmpty) {
+            frame = {
+              'bottom': rect.bottom / root.size.height,
+              'right': rect.right / root.size.width,
+              'aspect': root.size.aspectRatio,
+            };
+          }
+        }
+      }
+      final previous = _nativeVideoFrame;
+      if ((frame == null) != (previous == null) ||
+          (frame != null &&
+              (previous == null ||
+                  frame.entries.any(
+                    (entry) =>
+                        (entry.value - previous[entry.key]!).abs() > 0.0005,
+                  )))) {
+        _nativeVideoFrame = frame;
+        _updateVerticalBar();
+      }
+      _watchNativeVideoGeometry();
+    });
+  }
+
+  bool get _isInnerDisplay =>
+      IOSFoldableHelper.isIPhone && DeviceUtils.isTablet;
+
+  StreamSubscription<Object?>? _innerLayoutSubscription;
+
+  bool get _usesInnerSplitLayout => usesInnerVideoSplit(
+    isIPhone: IOSFoldableHelper.isIPhone,
+    windowSize: DeviceUtils.size,
+    layout: Pref.innerVideoDetailLayout,
+  );
+
+  bool get _usesOuterPortraitLayout => isOuterPortraitVideoLayout(
+    windowSize: DeviceUtils.size,
+    isIPhone: IOSFoldableHelper.isIPhone,
+    hasSideBar:
+        (IOSNativeTabBar.safeArea.value?.right ?? 0) >= 72 ||
+        IOSNativeTabBar.usesNativeVideoNavigation(context),
+  );
+
+  // Ordinary video pages retain the global rail, independent of player chrome.
+  void _updateVerticalBar() {
+    if (_nativeVideoUpdateScheduled) return;
+    _nativeVideoUpdateScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _nativeVideoUpdateScheduled = false;
+      if (!mounted || _nativeVideoRoute == null) return;
+      final player = videoDetailController.plPlayerController;
+      IOSNativeTabBar.setPageActions(
+        route: _nativeVideoRoute!,
+        actions: const [
+          NativePageAction(id: 'home', title: '返回主页'),
+          NativePageAction(id: 'fullscreen', title: '全屏'),
+        ],
+        video: NativeVideoChrome(
+          controlsVisible:
+              player.showControls.value &&
+              videoDetailController.autoPlay &&
+              videoDetailController.videoState.value &&
+              player.videoController != null,
+          fullScreen: player.isFullScreen.value,
+          locked: player.controlsLock.value,
+          frame: _nativeVideoFrame,
+          collapsed: _usesOuterPortraitLayout && _nativeVideoCollapsed,
+          paused: !player.playerStatus.isPlaying,
+        ),
+        onAction: (id) async {
+          if (!_isOnTop || !(_nativeVideoRoute?.isCurrent ?? false)) return;
+          switch (id) {
+            case 'home':
+              player.onCloseAll();
+            case 'fullscreen':
+              await player.triggerFullScreen();
+          }
+        },
+      );
+      _watchNativeVideoGeometry();
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
+  void _updatePadding() {
+    if (videoDetailController.removeSafeArea) {
+      padding = EdgeInsets.only(
+        right: IOSNativeTabBar.rightRailDevice.value
+            ? MediaQuery.viewPaddingOf(context).right
+            : 0,
+      );
+      return;
+    }
+    padding = MediaQuery.viewPaddingOf(context);
+  }
+
+  @override
+  void didPush() {
+    super.didPush();
+    // 订阅路由时调用，随后的 didChangeDependencies 会更新状态栏
+    _isOnTop = true;
+  }
+
+  @override
+  void didPop() {
+    _isOnTop = false;
+    _updateVerticalBar();
+    super.didPop();
+  }
+
   @override
   // 离开当前页面时
   void didPushNext() {
     super.didPushNext();
+    _isOnTop = false;
+    _updateVerticalBar();
     isShowing = false;
 
     removeObserverMobile(this);
@@ -407,6 +604,8 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
   // 返回当前页面时
   void didPopNext() {
     super.didPopNext();
+    _isOnTop = true;
+    _updateVerticalBar();
 
     if (videoDetailController.plPlayerController.isCloseAll) {
       return;
@@ -461,12 +660,13 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (videoDetailController.removeSafeArea) {
-      padding = .zero;
-    } else {
-      padding = MediaQuery.viewPaddingOf(context);
+    final route = ModalRoute.of(context);
+    if (_nativeVideoRoute != route) {
+      if (_nativeVideoRoute case final previous?) {
+        IOSNativeTabBar.removePageActions(previous);
+      }
+      _nativeVideoRoute = route;
     }
-
     final size = MediaQuery.sizeOf(context);
     maxWidth = size.width;
     maxHeight = size.height;
@@ -477,8 +677,18 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     videoDetailController.plPlayerController.screenRatio = maxHeight / maxWidth;
 
     final shortestSide = size.shortestSide;
-    final minVideoHeight = shortestSide / Style.aspectRatio16x9;
-    final maxVideoHeight = max(size.longestSide * 0.65, shortestSide);
+    var minVideoHeight = shortestSide / Style.aspectRatio16x9;
+    var maxVideoHeight = max(size.longestSide * 0.65, shortestSide);
+    if (_usesOuterPortraitLayout && IOSNativeTabBar.rightRailDevice.value) {
+      final insets = MediaQuery.viewPaddingOf(context);
+      final available = outerVideoHeightLimit(
+        height: size.height,
+        insets: insets,
+        uiScale: videoDetailController.uiScale,
+      );
+      maxVideoHeight = min(maxVideoHeight, available);
+      minVideoHeight = min(minVideoHeight, maxVideoHeight);
+    }
     videoDetailController
       ..isPortrait = isPortrait = maxHeight >= maxWidth
       ..minVideoHeight = minVideoHeight
@@ -486,10 +696,13 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       ..videoHeight = videoDetailController.isVertical.value
           ? maxVideoHeight
           : minVideoHeight;
+    _updatePadding();
 
     theme = videoDetailController.plPlayerController.darkVideoPage
         ? ThemeUtils.darkTheme
         : Theme.of(context);
+
+    _updateVerticalBar();
   }
 
   bool removeAppBar(bool isFullScreen) =>
@@ -578,6 +791,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                   maxExtent: height,
                   minVideoHeight: videoDetailController.minVideoHeight,
                   onScrollRatioChanged: videoDetailController.scrollRatio.call,
+                  onCollapsedChanged: _onNativeVideoCollapsed,
                   child: Stack(
                     clipBehavior: .none,
                     children: [
@@ -592,24 +806,28 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                 ),
               ];
             },
-            body: MiniScaffold(
-              key: videoDetailController.childKey,
-              body: Column(
-                children: [
-                  buildTabBar(onTap: videoDetailController.animToTop),
-                  Expanded(
-                    child: tabBarView(
-                      hitTestBehavior: .translucent,
-                      controller: videoDetailController.tabCtr,
-                      children: [
-                        videoIntro(isHorizontal: false, needCtr: false),
-                        if (videoDetailController.showReply)
-                          videoReplyPanel(isNested: true),
-                        if (_shouldShowSeasonPanel) seasonPanel,
-                      ],
+            // Only the video header can extend behind the persistent rail.
+            body: VideoDetailBodyInsets(
+              extendRight: false,
+              child: MiniScaffold(
+                key: videoDetailController.childKey,
+                body: Column(
+                  children: [
+                    buildTabBar(onTap: videoDetailController.animToTop),
+                    Expanded(
+                      child: tabBarView(
+                        hitTestBehavior: .translucent,
+                        controller: videoDetailController.tabCtr,
+                        children: [
+                          videoIntro(isHorizontal: false, needCtr: false),
+                          if (videoDetailController.showReply)
+                            videoReplyPanel(isNested: true),
+                          if (_shouldShowSeasonPanel) seasonPanel,
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -657,33 +875,37 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
                 child: Row(
                   mainAxisSize: .min,
                   children: [
-                    SizedBox(
-                      width: 42,
-                      height: 34,
-                      child: IconButton(
-                        tooltip: '返回',
-                        icon: Icon(
-                          FontAwesomeIcons.arrowLeft,
-                          size: 15,
-                          color: colorScheme.onSurface,
+                    if (!IOSNativeTabBar.usesNativeVideoNavigation(context) &&
+                        !IOSNativeTabBar.hasNativeBack(context))
+                      SizedBox(
+                        width: 42,
+                        height: 34,
+                        child: IconButton(
+                          tooltip: '返回',
+                          icon: Icon(
+                            FontAwesomeIcons.arrowLeft,
+                            size: 15,
+                            color: colorScheme.onSurface,
+                          ),
+                          onPressed: Get.back,
                         ),
-                        onPressed: Get.back,
                       ),
-                    ),
-                    SizedBox(
-                      width: 42,
-                      height: 34,
-                      child: IconButton(
-                        tooltip: '返回主页',
-                        icon: Icon(
-                          FontAwesomeIcons.house,
-                          size: 15,
-                          color: colorScheme.onSurface,
+                    if (!IOSNativeTabBar.usesNativeVideoNavigation(context))
+                      SizedBox(
+                        width: 42,
+                        height: 34,
+                        child: IconButton(
+                          tooltip: '返回主页',
+                          icon: Icon(
+                            FontAwesomeIcons.house,
+                            size: 15,
+                            color: colorScheme.onSurface,
+                          ),
+                          onPressed: videoDetailController
+                              .plPlayerController
+                              .onCloseAll,
                         ),
-                        onPressed:
-                            videoDetailController.plPlayerController.onCloseAll,
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -761,6 +983,52 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     );
   }
 
+  Widget get childInnerSplit => Obx(() {
+    final fullScreen = isFullScreen;
+    final showSeason = _shouldShowSeasonPanel;
+    final tabs = buildTabBar();
+    return SimpleScaffold(
+      appBar: removeAppBar(fullScreen)
+          ? null
+          : SimpleAppBar(
+              height: padding.top,
+              brightness: colorScheme.brightness,
+            ),
+      body: VideoDetailBodyInsets(
+        extendRight: false,
+        fullScreen: fullScreen,
+        child: InnerVideoSplitLayout(
+          fullScreen: fullScreen,
+          playerBuilder: (_, width, height) =>
+              videoPlayer(width: width, height: height),
+          detailsBuilder: (_, width, height) => MiniScaffold(
+            key: videoDetailController.childKey,
+            body: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                tabs,
+                Expanded(
+                  child: tabBarView(
+                    controller: videoDetailController.tabCtr,
+                    children: [
+                      videoIntro(
+                        width: width,
+                        height: height,
+                        isHorizontal: false,
+                      ),
+                      if (videoDetailController.showReply) videoReplyPanel(),
+                      if (showSeason) seasonPanel,
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  });
+
   Widget get childWhenDisabledLandscape => Obx(
     () {
       final isFullScreen = this.isFullScreen;
@@ -775,7 +1043,14 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
           padding: isFullScreen
               ? EdgeInsets.zero
               : padding.copyWith(top: 0, bottom: 0),
-          child: childWhenDisabledLandscapeInner(isFullScreen),
+          // The padding above takes the side insets, so the player controls must
+          // not add them again.
+          child: MediaQuery.removePadding(
+            context: context,
+            removeLeft: !isFullScreen,
+            removeRight: !isFullScreen,
+            child: childWhenDisabledLandscapeInner(isFullScreen),
+          ),
         ),
       );
     },
@@ -786,47 +1061,52 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     final double width = videoHeight * ratio;
     final videoWidth = isFullScreen ? maxWidth : width;
     final introWidth = maxWidth - width - padding.horizontal;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: videoWidth,
-          height: videoHeight,
-          child: videoPlayer(
+    return MediaQuery.removePadding(
+      context: context,
+      removeRight: _isInnerDisplay && !isFullScreen,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
             width: videoWidth,
             height: videoHeight,
+            child: videoPlayer(
+              width: videoWidth,
+              height: videoHeight,
+            ),
           ),
-        ),
-        Offstage(
-          offstage: isFullScreen,
-          child: SizedBox(
-            width: introWidth,
-            height: maxHeight - padding.top,
-            child: MiniScaffold(
-              key: videoDetailController.childKey,
-              body: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  buildTabBar(),
-                  Expanded(
-                    child: tabBarView(
-                      controller: videoDetailController.tabCtr,
-                      children: [
-                        videoIntro(
-                          width: introWidth,
-                          height: maxHeight,
-                        ),
-                        if (videoDetailController.showReply) videoReplyPanel(),
-                        if (_shouldShowSeasonPanel) seasonPanel,
-                      ],
+          Offstage(
+            offstage: isFullScreen,
+            child: SizedBox(
+              width: introWidth,
+              height: maxHeight - padding.top,
+              child: MiniScaffold(
+                key: videoDetailController.childKey,
+                body: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    buildTabBar(),
+                    Expanded(
+                      child: tabBarView(
+                        controller: videoDetailController.tabCtr,
+                        children: [
+                          videoIntro(
+                            width: introWidth,
+                            height: maxHeight,
+                          ),
+                          if (videoDetailController.showReply)
+                            videoReplyPanel(),
+                          if (_shouldShowSeasonPanel) seasonPanel,
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -897,10 +1177,18 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
   }
 
   Widget _childWhenDisabledLandscapeInner(bool isFullScreen) {
+    // 扣除左右安全区（如 iPhone Duo 右侧状态栏），保证右侧栏的最小宽度
+    final availableWidth = maxWidth - padding.horizontal;
     double width =
-        clampDouble(maxHeight / maxWidth * 1.08, 0.5, 0.7) * maxWidth;
-    if (maxWidth >= 560) {
-      width = maxWidth - clampDouble(maxWidth - width, 280, 425);
+        clampDouble(maxHeight / availableWidth * 1.08, 0.5, 0.7) *
+        availableWidth;
+    if (availableWidth >= 560) {
+      // 右侧栏的横向视频卡片封面固定 160 宽，栏宽不足约 380 时
+      // 播放数、弹幕数会和更多按钮重叠；宽屏下尽量留足
+      final minRightWidth = clampDouble(availableWidth * 0.4, 280, 380);
+      width =
+          availableWidth -
+          clampDouble(availableWidth - width, minRightWidth, 425);
     }
     final videoWidth = isFullScreen ? maxWidth : width;
     final double height = width / Style.aspectRatio16x9;
@@ -946,7 +1234,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
         Offstage(
           offstage: isFullScreen,
           child: SizedBox(
-            width: maxWidth - width - padding.horizontal,
+            width: availableWidth - width,
             height: maxHeight - padding.top,
             child: MiniScaffold(
               key: videoDetailController.childKey,
@@ -1005,8 +1293,15 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       body: Padding(
         padding: isFullScreen
             ? EdgeInsets.zero
-            : padding.copyWith(top: 0, bottom: 0),
-        child: childWhenDisabledAlmostSquareInner(isFullScreen),
+            : EdgeInsets.only(left: padding.left),
+        // Keep the full-width inner player's camera inset for its controls;
+        // only the lower detail content consumes that right inset.
+        child: MediaQuery.removePadding(
+          context: context,
+          removeLeft: !isFullScreen,
+          removeRight: false,
+          child: childWhenDisabledAlmostSquareInner(isFullScreen),
+        ),
       ),
     );
   });
@@ -1050,34 +1345,39 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
           child: SizedBox(
             width: maxWidth - padding.horizontal,
             height: bottomHeight,
-            child: MiniScaffold(
-              key: videoDetailController.childKey,
-              body: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  buildTabBar(needIndicator: false),
-                  Expanded(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: videoIntro(
-                            width: () {
-                              double flex = 1;
-                              if (videoDetailController.showReply) flex++;
-                              if (shouldShowSeasonPanel) flex++;
-                              return maxWidth / flex;
-                            }(),
-                            height: bottomHeight,
+            child: MediaQuery.removePadding(
+              context: context,
+              removeRight: true,
+              child: MiniScaffold(
+                key: videoDetailController.childKey,
+                body: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    buildTabBar(needIndicator: false),
+                    Expanded(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: videoIntro(
+                              width: () {
+                                double flex = 1;
+                                if (videoDetailController.showReply) flex++;
+                                if (shouldShowSeasonPanel) flex++;
+                                return maxWidth / flex;
+                              }(),
+                              height: bottomHeight,
+                            ),
                           ),
-                        ),
-                        if (videoDetailController.showReply)
-                          Expanded(child: videoReplyPanel()),
-                        if (shouldShowSeasonPanel) Expanded(child: seasonPanel),
-                      ],
+                          if (videoDetailController.showReply)
+                            Expanded(child: videoReplyPanel()),
+                          if (shouldShowSeasonPanel)
+                            Expanded(child: seasonPanel),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -1088,73 +1388,78 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
 
   Widget manualPlayerWidget(double height) => Obx(() {
     if (!videoDetailController.autoPlay) {
-      return Stack(
-        children: [
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: kToolbarHeight,
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 42,
-                  height: 34,
-                  child: IconButton(
-                    tooltip: '返回',
-                    icon: const Icon(
-                      FontAwesomeIcons.arrowLeft,
-                      size: 15,
-                      color: Colors.white,
-                      shadows: [
-                        Shadow(
-                          blurRadius: 1.5,
-                          color: Colors.black,
+      return ViewSafeArea(
+        child: Stack(
+          children: [
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: kToolbarHeight,
+              child: Row(
+                children: [
+                  if (!IOSNativeTabBar.usesNativeVideoNavigation(context) &&
+                      !IOSNativeTabBar.hasNativeBack(context))
+                    SizedBox(
+                      width: 42,
+                      height: 34,
+                      child: IconButton(
+                        tooltip: '返回',
+                        icon: const Icon(
+                          FontAwesomeIcons.arrowLeft,
+                          size: 15,
+                          color: Colors.white,
+                          shadows: [
+                            Shadow(
+                              blurRadius: 1.5,
+                              color: Colors.black,
+                            ),
+                          ],
                         ),
-                      ],
+                        onPressed: Get.back,
+                      ),
                     ),
-                    onPressed: Get.back,
-                  ),
-                ),
-                SizedBox(
-                  width: 42,
-                  height: 34,
-                  child: IconButton(
-                    tooltip: '返回主页',
-                    icon: const Icon(
-                      FontAwesomeIcons.house,
-                      size: 15,
-                      color: Colors.white,
-                      shadows: [
-                        Shadow(
-                          blurRadius: 1.5,
-                          color: Colors.black,
+                  if (!IOSNativeTabBar.usesNativeVideoNavigation(context))
+                    SizedBox(
+                      width: 42,
+                      height: 34,
+                      child: IconButton(
+                        tooltip: '返回主页',
+                        icon: const Icon(
+                          FontAwesomeIcons.house,
+                          size: 15,
+                          color: Colors.white,
+                          shadows: [
+                            Shadow(
+                              blurRadius: 1.5,
+                              color: Colors.black,
+                            ),
+                          ],
                         ),
-                      ],
+                        onPressed:
+                            videoDetailController.plPlayerController.onCloseAll,
+                      ),
                     ),
-                    onPressed:
-                        videoDetailController.plPlayerController.onCloseAll,
+                  const Spacer(),
+                  _moreBtn(
+                    Colors.white,
+                    shadows: const [
+                      Shadow(
+                        blurRadius: 1.5,
+                        color: Colors.black,
+                      ),
+                    ],
                   ),
-                ),
-                const Spacer(),
-                _moreBtn(
-                  Colors.white,
-                  shadows: const [
-                    Shadow(
-                      blurRadius: 1.5,
-                      color: Colors.black,
-                    ),
-                  ],
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          Positioned(
-            right: 12,
-            top: height - 70,
-            child: const PlayIcon(),
-          ),
-        ],
+            Positioned(
+              right: 12,
+              top: height - 70,
+              child: const PlayIcon(),
+            ),
+          ],
+        ),
       );
     }
     return const SizedBox.shrink();
@@ -1215,7 +1520,9 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     canPop:
         !isFullScreen &&
         !videoDetailController.plPlayerController.isDesktopPip &&
-        (videoDetailController.horizontalScreen || isPortrait),
+        (videoDetailController.horizontalScreen ||
+            _usesInnerSplitLayout ||
+            isPortrait),
     onPopInvokedWithResult:
         videoDetailController.plPlayerController.onPopInvokedWithResult,
     child: Obx(
@@ -1269,7 +1576,10 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     Widget child;
     if (videoDetailController.plPlayerController.isPipMode) {
       child = plPlayer(width: maxWidth, height: maxHeight, isPipMode: true);
-    } else if (!videoDetailController.horizontalScreen) {
+    } else if (_usesInnerSplitLayout) {
+      child = childInnerSplit;
+    } else if (_usesOuterPortraitLayout ||
+        !videoDetailController.horizontalScreen) {
       child = childWhenDisabled;
     } else if (maxWidth / maxHeight >= kScreenRatio) {
       child = childWhenDisabledLandscape;
@@ -1458,6 +1768,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
   Widget videoPlayer({required double width, required double height}) {
     final isFullScreen = this.isFullScreen;
     return Stack(
+      key: _nativeVideoBoundsKey,
       clipBehavior: Clip.none,
       children: [
         const Positioned.fill(

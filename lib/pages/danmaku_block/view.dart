@@ -1,3 +1,4 @@
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:PiliPlus/common/widgets/button/icon_button.dart';
 import 'package:PiliPlus/common/widgets/dialog/dialog.dart';
 import 'package:PiliPlus/common/widgets/keep_alive_wrapper.dart';
@@ -51,7 +52,10 @@ class _DanmakuBlockPageState extends State<DanmakuBlockPage> {
   @override
   Widget build(BuildContext context) {
     return SimpleScaffold(
-      appBar: AppBar(title: const Text('弹幕屏蔽')),
+      appBar: AppBar(
+        automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
+        title: const Text('弹幕屏蔽'),
+      ),
       body: Column(
         children: [
           TabBar(

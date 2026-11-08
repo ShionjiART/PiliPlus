@@ -1,3 +1,8 @@
+import 'package:PiliPlus/common/widgets/appbar/rail_floating_app_bar.dart';
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
+import 'package:PiliPlus/common/widgets/native_comment_button.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+
 import 'dart:io';
 import 'dart:math';
 
@@ -56,9 +61,18 @@ class _MusicDetailPageState extends CommonDynPageState<MusicDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final overlayHeader =
+        isPortrait && (RailViewportScope.of(context)?.normalizedTop ?? false);
     return fabAnimWrapper(
       child: SimpleScaffold(
-        appBar: _buildAppBar(),
+        overlayAppBar: overlayHeader,
+        appBar: Obx(
+          () => RailFloatingAppBar(
+            overlay: overlayHeader,
+            visible: controller.showTitle.value,
+            child: _buildAppBar(),
+          ),
+        ),
         body: Padding(
           padding: EdgeInsets.only(left: padding.left, right: padding.right),
           child: isPortrait
@@ -73,6 +87,7 @@ class _MusicDetailPageState extends CommonDynPageState<MusicDetailPage> {
   }
 
   PreferredSizeWidget _buildAppBar() => AppBar(
+    automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
     title: Padding(
       padding: const EdgeInsets.only(right: 12),
       child: Obx(
@@ -205,7 +220,7 @@ class _MusicDetailPageState extends CommonDynPageState<MusicDetailPage> {
     if (!controller.showDynActionBar) {
       return Padding(
         padding: const .only(right: kFloatingActionButtonMargin),
-        child: SlideTransition(
+        child: CommentFabTransition(
           position: fabAnimation,
           child: fabButton,
         ),
@@ -244,20 +259,23 @@ class _MusicDetailPageState extends CommonDynPageState<MusicDetailPage> {
       );
     }
 
-    return SlideTransition(
-      position: fabAnimation,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Padding(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        CommentFabTransition(
+          position: fabAnimation,
+          child: Padding(
             padding: const EdgeInsets.only(
               right: kFloatingActionButtonMargin,
               bottom: kFloatingActionButtonMargin,
             ),
             child: replyButton,
           ),
-          Container(
+        ),
+        SlideTransition(
+          position: fabAnimation,
+          child: Container(
             decoration: BoxDecoration(
               color: theme.colorScheme.surface,
               border: Border(
@@ -341,8 +359,8 @@ class _MusicDetailPageState extends CommonDynPageState<MusicDetailPage> {
               ],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -563,7 +581,7 @@ class _MusicDetailPageState extends CommonDynPageState<MusicDetailPage> {
                   _buildRank(
                     item.musicRelation,
                     '使用稿件量',
-                    () => Get.to(
+                    () => Get.toSafe(
                       const MusicRecommendPage(),
                       arguments: (id: controller.musicId, item: item),
                     ),

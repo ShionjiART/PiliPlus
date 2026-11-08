@@ -1,3 +1,5 @@
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
 // ignore_for_file: constant_identifier_names
 
 import 'dart:async' show StreamSubscription;
@@ -388,18 +390,32 @@ abstract final class PiliScheme {
             }
             return false;
           case 'livearea':
-            Get.to(
-              SimpleScaffold(
-                appBar: AppBar(title: const Text('直播')),
-                body: const ViewSafeArea(child: LivePage()),
+            Get.toSafe(
+              () => Builder(
+                builder: (context) => SimpleScaffold(
+                  appBar: AppBar(
+                    automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(
+                      context,
+                    ),
+                    title: const Text('直播'),
+                  ),
+                  body: const ViewSafeArea(child: LivePage()),
+                ),
               ),
             );
             return true;
           case 'rank':
-            Get.to(
-              SimpleScaffold(
-                appBar: AppBar(title: const Text('排行榜')),
-                body: const ViewSafeArea(child: RankPage()),
+            Get.toSafe(
+              () => Builder(
+                builder: (context) => SimpleScaffold(
+                  appBar: AppBar(
+                    automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(
+                      context,
+                    ),
+                    title: const Text('排行榜'),
+                  ),
+                  body: const ViewSafeArea(child: RankPage()),
+                ),
               ),
             );
             return true;

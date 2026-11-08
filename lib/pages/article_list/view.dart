@@ -1,3 +1,4 @@
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:PiliPlus/common/widgets/flutter/refresh_indicator.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
@@ -98,6 +99,7 @@ class _ArticleListPageState extends State<ArticleListPage> with GridMixin {
       style: TextStyle(color: theme.colorScheme.outline.withValues(alpha: 0.7)),
     );
     return SliverAppBar.medium(
+      automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
       title: Text(item.name!),
       pinned: true,
       expandedHeight: kToolbarHeight + 127,

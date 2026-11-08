@@ -1,3 +1,5 @@
+import 'package:PiliPlus/utils/extension/get_ext.dart';
+
 import 'dart:async';
 
 import 'package:PiliPlus/common/widgets/dialog/dialog.dart';
@@ -225,7 +227,7 @@ class FavDetailController
           SmartDialog.showToast('内容太多啦！超过1000不支持排序');
           return;
         }
-        Get.to(FavSortPage(favDetailController: this));
+        Get.toSafe(FavSortPage(favDetailController: this));
       }
     }
   }

@@ -1,3 +1,5 @@
+import 'package:PiliPlus/common/widgets/native_comment_button.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:PiliPlus/common/widgets/flutter/refresh_indicator.dart';
 import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
 import 'package:PiliPlus/common/widgets/view_safe_area.dart';
@@ -35,7 +37,10 @@ class _MatchInfoPageState extends CommonDynPageState<MatchInfoPage> {
   Widget build(BuildContext context) {
     return fabAnimWrapper(
       child: SimpleScaffold(
-        appBar: AppBar(title: const Text('比赛详情')),
+        appBar: AppBar(
+          automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
+          title: const Text('比赛详情'),
+        ),
         body: ViewSafeArea(
           child: refreshIndicator(
             onRefresh: controller.onRefresh,
@@ -49,7 +54,7 @@ class _MatchInfoPageState extends CommonDynPageState<MatchInfoPage> {
             ),
           ),
         ).constraintWidth(),
-        fab: SlideTransition(
+        fab: CommentFabTransition(
           position: fabAnimation,
           child: fabButton,
         ),
@@ -75,27 +80,30 @@ class _MatchInfoPageState extends CommonDynPageState<MatchInfoPage> {
 
   @override
   void replyReply(BuildContext context, ReplyInfo replyItem, int? id) {
-    Get.to(
-      SimpleScaffold(
-        appBar: AppBar(
-          title: const Text('评论详情'),
-          shape: Border(
-            bottom: BorderSide(
-              color: theme.colorScheme.outline.withValues(alpha: 0.1),
+    Get.toSafe(
+      () => Builder(
+        builder: (context) => SimpleScaffold(
+          appBar: AppBar(
+            automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
+            title: const Text('评论详情'),
+            shape: Border(
+              bottom: BorderSide(
+                color: theme.colorScheme.outline.withValues(alpha: 0.1),
+              ),
             ),
           ),
+          body: ViewSafeArea(
+            child: VideoReplyReplyPanel(
+              enableSlide: false,
+              id: id,
+              oid: replyItem.oid.toInt(),
+              rpid: replyItem.id.toInt(),
+              isVideoDetail: false,
+              replyType: controller.replyType,
+              firstFloor: replyItem,
+            ),
+          ).constraintWidth(),
         ),
-        body: ViewSafeArea(
-          child: VideoReplyReplyPanel(
-            enableSlide: false,
-            id: id,
-            oid: replyItem.oid.toInt(),
-            rpid: replyItem.id.toInt(),
-            isVideoDetail: false,
-            replyType: controller.replyType,
-            firstFloor: replyItem,
-          ),
-        ).constraintWidth(),
       ),
     );
   }

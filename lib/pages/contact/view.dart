@@ -1,3 +1,5 @@
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+import 'package:PiliPlus/common/widgets/view_safe_area.dart';
 import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
 import 'package:PiliPlus/common/widgets/scroll_physics.dart' show tabBarView;
 import 'package:PiliPlus/pages/fan/view.dart';
@@ -42,12 +44,14 @@ class _ContactPageState extends State<ContactPage>
   Widget build(BuildContext context) {
     return SimpleScaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
         title: const Text('通讯录'),
         actions: [
           IconButton(
             onPressed: () async {
               final UserModel? userModel = await Navigator.of(context).push(
                 GetPageRoute(
+                  middlewares: [SideSafeRouteMiddleware()],
                   page: () => FollowSearchPage(
                     mid: mid,
                     isFromSelect: widget.isFromSelect,

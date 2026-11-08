@@ -1,3 +1,4 @@
+import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:PiliPlus/common/widgets/dialog/dialog.dart';
 import 'package:PiliPlus/grpc/bilibili/app/im/v1.pb.dart'
     show ThreeDotItem, ThreeDotItemType, IMSettingType;
@@ -59,7 +60,7 @@ extension ThreeDotItemTypeExt on ThreeDotItemType {
           onConfirm: controller.onDeleteList,
         );
       case ThreeDotItemType.THREE_DOT_ITEM_TYPE_MSG_SETTING:
-        Get.to(
+        Get.toSafe(
           const WhisperSettingsPage(
             imSettingType: IMSettingType.SETTING_TYPE_NEED_ALL,
           ),
@@ -82,7 +83,7 @@ extension ThreeDotItemTypeExt on ThreeDotItemType {
           );
         }
       case ThreeDotItemType.THREE_DOT_ITEM_TYPE_CONTACTS:
-        Get.to(const ContactPage(isFromSelect: false));
+        Get.toSafe(const ContactPage(isFromSelect: false));
       default:
         SmartDialog.showToast('TODO: $name');
     }

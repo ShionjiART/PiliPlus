@@ -1,3 +1,4 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
 import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/badge.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
@@ -296,7 +297,7 @@ Widget module(
               ),
             ),
           ),
-          if (floor == 1) const SizedBox(width: 12),
+          if (floor == 1) SizedBox(width: railTrailingSpace(context, 12)),
         ],
       );
 
@@ -313,7 +314,10 @@ Widget module(
     default:
       return Padding(
         padding: floor == 1
-            ? const EdgeInsets.symmetric(horizontal: 12)
+            ? railPageInsets(
+                context,
+                const EdgeInsets.symmetric(horizontal: 12),
+              )
             : EdgeInsets.zero,
         child: Text('暂未支持的类型: \n${item.idStr}\n${item.type}'),
       );

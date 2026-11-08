@@ -1,3 +1,4 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
 import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/flutter/refresh_indicator.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
@@ -54,7 +55,7 @@ class _MemberBangumiState extends State<MemberBangumi>
           SliverPadding(
             padding: EdgeInsets.only(
               left: Style.safeSpace,
-              right: Style.safeSpace,
+              right: railTrailingSpace(context, Style.safeSpace),
               top: Style.safeSpace,
               bottom: MediaQuery.viewPaddingOf(context).bottom + 100,
             ),

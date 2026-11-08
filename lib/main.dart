@@ -22,6 +22,9 @@ import 'package:PiliPlus/utils/device_utils.dart';
 import 'package:PiliPlus/utils/extension/core_palettes_ext.dart';
 import 'package:PiliPlus/utils/extension/theme_ext.dart';
 import 'package:PiliPlus/utils/font_utils.dart';
+import 'package:PiliPlus/utils/ios/foldable_helper.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+import 'package:PiliPlus/utils/ios/native_navigation_observer.dart';
 import 'package:PiliPlus/utils/ios/pip_helper.dart';
 import 'package:PiliPlus/utils/json_file_handler.dart';
 import 'package:PiliPlus/utils/max_screen_size.dart';
@@ -52,6 +55,21 @@ import 'package:window_manager/window_manager.dart';
 WebViewEnvironment? webViewEnvironment;
 
 EdgeInsets? tmpPadding;
+
+final nativeNavigationObserver = NativeNavigationObserver(
+  onCanGoBackChanged: IOSNativeTabBar.setCanGoBack,
+  onTopRouteChanged: IOSNativeTabBar.setTopRoute,
+);
+
+Future<void> _onNativeBack() async {
+  if (SmartDialog.checkExist()) {
+    await SmartDialog.dismiss();
+    return;
+  }
+  if (!nativeNavigationObserver.canGoBack) return;
+  // maybePop respects PopScope: fullscreen, unsaved edits, multi-selection, etc.
+  await Get.key.currentState?.maybePop();
+}
 
 Future<void> _initDownPath() async {
   if (PlatformUtils.isDesktop) {
@@ -116,10 +134,21 @@ void main() async {
 
   if (PlatformUtils.isMobile) {
     if (Platform.isAndroid) MaxScreenSize.init();
+    if (Platform.isIOS) {
+      IOSNativeTabBar.onBack = _onNativeBack;
+      IOSNativeTabBar.onReturnToRoot = nativeNavigationObserver.returnToRoot;
+      await IOSFoldableHelper.init();
+    }
     await Future.wait([
-      if (Pref.horizontalScreen) ?fullMode() else ?portraitUpMode(),
+      if (Platform.isIOS)
+        IOSFoldableHelper.applyOrientation()
+      else if (Pref.horizontalScreen)
+        ?fullMode()
+      else
+        ?portraitUpMode(),
       setupServiceLocator(),
       if (Platform.isIOS) IOSPipHelper.init(),
+      if (Platform.isIOS) IOSNativeTabBar.init(),
     ]);
   } else if (Platform.isWindows) {
     if (await WebViewEnvironment.getAvailableVersion() != null) {
@@ -309,6 +338,7 @@ class MyApp extends StatelessWidget {
       ),
       navigatorObservers: [
         routeObserver,
+        if (Platform.isIOS) nativeNavigationObserver,
         FlutterSmartDialog.observer,
       ],
       scrollBehavior: PlatformUtils.isDesktop
@@ -321,6 +351,10 @@ class MyApp extends StatelessWidget {
     final uiScale = Pref.uiScale;
     final mediaQuery = MediaQuery.of(context);
     final textScaler = TextScaler.linear(Pref.defaultTextScale);
+    if (Platform.isIOS && tmpPadding == null) {
+      // 放在下面的 MediaQuery 之内，以覆盖它的内边距
+      child = NativeSafeArea(scale: uiScale, child: child!);
+    }
     if (uiScale != 1.0) {
       child = MediaQuery(
         data: mediaQuery.copyWith(

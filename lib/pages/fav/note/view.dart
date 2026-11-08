@@ -1,3 +1,4 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
 import 'package:PiliPlus/pages/fav/note/child_view.dart';
 import 'package:PiliPlus/pages/fav/note/controller.dart';
 import 'package:PiliPlus/utils/extension/scroll_controller_ext.dart';
@@ -49,7 +50,10 @@ class _FavNotePageState extends State<FavNotePage>
                 isScrollable: true,
                 tabAlignment: TabAlignment.start,
                 controller: _tabController,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
+                padding: railPageInsets(
+                  context,
+                  const EdgeInsets.symmetric(horizontal: 8),
+                ),
                 dividerHeight: 0,
                 indicatorWeight: 0,
                 indicatorPadding: const EdgeInsets.symmetric(
@@ -108,7 +112,7 @@ class _FavNotePageState extends State<FavNotePage>
           ],
         ),
         Expanded(
-          child: TabBarView(
+          child: RailTabBarView(
             controller: _tabController,
             physics: const NeverScrollableScrollPhysics(),
             children: const [

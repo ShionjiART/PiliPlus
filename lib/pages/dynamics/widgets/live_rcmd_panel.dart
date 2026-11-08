@@ -1,3 +1,4 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
 import 'package:PiliPlus/common/assets.dart';
 import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/badge.dart';
@@ -21,7 +22,10 @@ Widget liveRcmdPanel(
   }
   EdgeInsets padding;
   if (floor == 1) {
-    padding = const EdgeInsets.symmetric(horizontal: 12);
+    padding = railPageInsets(
+      context,
+      const EdgeInsets.symmetric(horizontal: 12),
+    );
   } else {
     padding = EdgeInsets.zero;
   }

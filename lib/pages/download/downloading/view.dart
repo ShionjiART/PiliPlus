@@ -1,3 +1,4 @@
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:PiliPlus/common/widgets/appbar/appbar.dart';
 import 'package:PiliPlus/common/widgets/dialog/dialog.dart';
 import 'package:PiliPlus/common/widgets/flutter/pop_scope.dart';
@@ -46,6 +47,9 @@ class _DownloadingPageState extends State<DownloadingPage>
           appBar: MultiSelectAppBarWidget(
             ctr: this,
             child: AppBar(
+              automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(
+                context,
+              ),
               title: const Text('正在缓存'),
               actions: [
                 IconButton(

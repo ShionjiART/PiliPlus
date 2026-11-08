@@ -1,3 +1,7 @@
+import 'package:PiliPlus/common/widgets/native_comment_button.dart';
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+
 import 'dart:math';
 
 import 'package:PiliPlus/common/widgets/badge.dart';
@@ -80,7 +84,7 @@ class _ArticlePageState extends CommonDynPageState<ArticlePage>
           padding: .only(left: padding.left, right: padding.right),
           child: _buildPage(),
         ),
-        fab: SlideTransition(
+        fab: CommentFabTransition(
           position: fabAnimation,
           child: _buildBottom(),
         ),
@@ -275,6 +279,7 @@ class _ArticlePageState extends CommonDynPageState<ArticlePage>
   );
 
   PreferredSizeWidget _buildAppBar() => AppBar(
+    automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
     title: Obx(() {
       if (controller.isLoaded.value && controller.showTitle.value) {
         return Text(controller.summary.title!);
@@ -542,7 +547,7 @@ class _ArticlePageState extends CommonDynPageState<ArticlePage>
           height: height,
           width: maxWidth,
           margin: const .only(bottom: 10),
-          child: PageView.builder(
+          child: RailPageView.builder(
             physics: tabBarScrollPhysics,
             horizontalDragGestureRecognizer:
                 CustomHorizontalDragGestureRecognizer.new,

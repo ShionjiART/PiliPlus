@@ -1,3 +1,6 @@
+import 'package:PiliPlus/common/widgets/native_comment_button.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:PiliPlus/common/skeleton/video_reply.dart';
 import 'package:PiliPlus/common/sliver_single_child_delegate.dart';
 import 'package:PiliPlus/common/style.dart';
@@ -66,7 +69,10 @@ class _MainReplyPageState extends State<MainReplyPage>
   @override
   Widget build(BuildContext context) {
     return SimpleScaffold(
-      appBar: AppBar(title: const Text('查看评论')),
+      appBar: AppBar(
+        automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
+        title: const Text('查看评论'),
+      ),
       body: fabAnimWrapper(
         child: refreshIndicator(
           onRefresh: controller.onRefresh,
@@ -85,27 +91,29 @@ class _MainReplyPageState extends State<MainReplyPage>
           ),
         ).constraintWidth(),
       ),
-      fab: SlideTransition(
+      fab: CommentFabTransition(
         position: fabAnimation,
         child: Padding(
           padding: .only(
             right: kFloatingActionButtonMargin + padding.right,
             bottom: kFloatingActionButtonMargin + padding.bottom,
           ),
-          child: FloatingActionButton(
-            heroTag: null,
-            onPressed: () {
-              try {
-                feedBack();
-                controller.onReply(
-                  null,
-                  oid: controller.oid,
-                  replyType: controller.replyType,
-                );
-              } catch (_) {}
-            },
-            tooltip: '评论',
-            child: const Icon(Icons.reply),
+          child: NativeCommentButton(
+            child: FloatingActionButton(
+              heroTag: null,
+              onPressed: () {
+                try {
+                  feedBack();
+                  controller.onReply(
+                    null,
+                    oid: controller.oid,
+                    replyType: controller.replyType,
+                  );
+                } catch (_) {}
+              },
+              tooltip: '评论',
+              child: const Icon(Icons.reply),
+            ),
           ),
         ),
       ),
@@ -199,28 +207,31 @@ class _MainReplyPageState extends State<MainReplyPage>
   }
 
   void replyReply(ReplyInfo replyItem, int? id) {
-    Get.to(
-      SimpleScaffold(
-        appBar: AppBar(
-          title: const Text('评论详情'),
-          shape: Border(
-            bottom: BorderSide(
-              color: colorScheme.outline.withValues(alpha: 0.1),
+    Get.toSafe(
+      () => Builder(
+        builder: (context) => SimpleScaffold(
+          appBar: AppBar(
+            automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
+            title: const Text('评论详情'),
+            shape: Border(
+              bottom: BorderSide(
+                color: colorScheme.outline.withValues(alpha: 0.1),
+              ),
             ),
           ),
+          body: ViewSafeArea(
+            child: VideoReplyReplyPanel(
+              enableSlide: false,
+              id: id,
+              oid: replyItem.oid.toInt(),
+              rpid: replyItem.id.toInt(),
+              isVideoDetail: false,
+              replyType: controller.replyType,
+              firstFloor: replyItem,
+              upMid: controller.upMid,
+            ),
+          ).constraintWidth(),
         ),
-        body: ViewSafeArea(
-          child: VideoReplyReplyPanel(
-            enableSlide: false,
-            id: id,
-            oid: replyItem.oid.toInt(),
-            rpid: replyItem.id.toInt(),
-            isVideoDetail: false,
-            replyType: controller.replyType,
-            firstFloor: replyItem,
-            upMid: controller.upMid,
-          ),
-        ).constraintWidth(),
       ),
       routeName: 'dynamicDetail-Copy',
     );

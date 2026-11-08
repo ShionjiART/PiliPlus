@@ -1,3 +1,4 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
 import 'package:PiliPlus/common/widgets/sliver/sliver_floating_header.dart';
 import 'package:PiliPlus/models/search/result.dart';
 import 'package:PiliPlus/pages/search_panel/article/controller.dart';
@@ -48,7 +49,10 @@ class _SearchArticlePanelState
     return SliverFloatingHeaderWidget(
       backgroundColor: colorScheme.surface,
       child: Padding(
-        padding: const .fromLTRB(25, 0, 12, 4),
+        padding: railPageInsets(
+          context,
+          const EdgeInsets.fromLTRB(25, 0, 12, 4),
+        ),
         child: Row(
           children: [
             Obx(

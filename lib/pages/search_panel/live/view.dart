@@ -1,3 +1,4 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
 import 'package:PiliPlus/common/skeleton/video_card_v.dart';
 import 'package:PiliPlus/common/sliver_single_child_delegate.dart';
 import 'package:PiliPlus/common/style.dart';
@@ -56,7 +57,10 @@ class _SearchLivePanelState
   @override
   Widget buildList(List<SearchLiveItemModel> list) {
     return SliverPadding(
-      padding: const .only(left: Style.safeSpace, right: Style.safeSpace),
+      padding: railPageInsets(
+        context,
+        const EdgeInsets.only(left: Style.safeSpace, right: Style.safeSpace),
+      ),
       sliver: SliverGrid.builder(
         gridDelegate: gridDelegate,
         itemBuilder: (context, index) {
@@ -72,7 +76,10 @@ class _SearchLivePanelState
 
   @override
   Widget get buildLoading => SliverPadding(
-    padding: const .only(left: Style.safeSpace, right: Style.safeSpace),
+    padding: railPageInsets(
+      context,
+      const EdgeInsets.only(left: Style.safeSpace, right: Style.safeSpace),
+    ),
     sliver: SliverGrid(
       gridDelegate: gridDelegate,
       delegate: const SliverSingleChildDelegate(

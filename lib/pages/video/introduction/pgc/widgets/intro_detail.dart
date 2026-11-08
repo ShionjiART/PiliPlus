@@ -1,3 +1,4 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
 import 'package:PiliPlus/common/widgets/keep_alive_wrapper.dart';
 import 'package:PiliPlus/common/widgets/scroll_physics.dart'
     show tabBarScrollPhysics;
@@ -94,7 +95,7 @@ class _IntroDetailState extends State<PgcIntroPanel>
 
   @override
   Widget buildList() {
-    return TabBarView(
+    return RailTabBarView(
       controller: _tabController,
       physics: tabBarScrollPhysics,
       horizontalDragGestureRecognizer: horizontalDragGestureRecognizer,

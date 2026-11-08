@@ -1,3 +1,5 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
+
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:math' show max;
@@ -303,7 +305,7 @@ class _PayCoinsPageState extends State<PayCoinsPage>
                       padding: const EdgeInsets.symmetric(horizontal: 28),
                       child: SizedBox(
                         height: 100,
-                        child: PageView(
+                        child: RailPageView(
                           physics: tabBarScrollPhysics,
                           controller: _controller,
                           onPageChanged: (index) {

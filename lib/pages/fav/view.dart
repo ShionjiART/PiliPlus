@@ -1,3 +1,5 @@
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
 import 'package:PiliPlus/common/widgets/scroll_physics.dart' show tabBarView;
 import 'package:PiliPlus/common/widgets/view_safe_area.dart';
@@ -54,6 +56,7 @@ class _FavPageState extends State<FavPage> with SingleTickerProviderStateMixin {
   Widget build(BuildContext context) {
     return SimpleScaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
         title: const Text('我的收藏'),
         actions: [
           Obx(
@@ -87,7 +90,7 @@ class _FavPageState extends State<FavPage> with SingleTickerProviderStateMixin {
                           SmartDialog.showToast('加载全部收藏夹再排序');
                           return;
                         }
-                        Get.to(
+                        Get.toSafe(
                           FavFolderSortPage(favController: _favController),
                         );
                       }

@@ -1,3 +1,5 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
+import 'package:PiliPlus/common/widgets/native_comment_button.dart';
 import 'package:PiliPlus/common/widgets/dialog/simple_dialog_option.dart';
 import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
 import 'package:PiliPlus/models/common/pgc_review_type.dart';
@@ -89,7 +91,7 @@ class _PgcReviewPageState extends State<PgcReviewPage>
             },
           ),
           Expanded(
-            child: TabBarView(
+            child: RailTabBarView(
               controller: _tabController,
               physics: const NeverScrollableScrollPhysics(),
               children: PgcReviewType.values
@@ -112,46 +114,48 @@ class _PgcReviewPageState extends State<PgcReviewPage>
               MediaQuery.viewPaddingOf(context).bottom +
               kFloatingActionButtonMargin,
         ),
-        child: FloatingActionButton(
-          onPressed: () => showDialog(
-            context: context,
-            builder: (context) => SimpleDialog(
-              clipBehavior: Clip.hardEdge,
-              contentPadding: const EdgeInsets.symmetric(vertical: 12),
-              children: [
-                DialogOption(
-                  child: const Text('写短评', style: TextStyle(fontSize: 14)),
-                  onPressed: () {
-                    Get.back();
-                    showModalBottomSheet(
-                      context: context,
-                      useSafeArea: true,
-                      isScrollControlled: true,
-                      builder: (context) {
-                        return PgcReviewPostPanel(
-                          name: widget.name,
-                          mediaId: widget.mediaId,
-                        );
-                      },
-                    );
-                  },
-                ),
-                DialogOption(
-                  child: const Text('写长评', style: TextStyle(fontSize: 14)),
-                  onPressed: () => Get
-                    ..back()
-                    ..toNamed(
-                      '/webview',
-                      parameters: {
-                        'url':
-                            'https://member.bilibili.com/article-text/mobile?theme=${theme.isDark ? 1 : 0}&media_id=${widget.mediaId}',
-                      },
-                    ),
-                ),
-              ],
+        child: NativeCommentButton(
+          child: FloatingActionButton(
+            onPressed: () => showDialog(
+              context: context,
+              builder: (context) => SimpleDialog(
+                clipBehavior: Clip.hardEdge,
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                children: [
+                  DialogOption(
+                    child: const Text('写短评', style: TextStyle(fontSize: 14)),
+                    onPressed: () {
+                      Get.back();
+                      showModalBottomSheet(
+                        context: context,
+                        useSafeArea: true,
+                        isScrollControlled: true,
+                        builder: (context) {
+                          return PgcReviewPostPanel(
+                            name: widget.name,
+                            mediaId: widget.mediaId,
+                          );
+                        },
+                      );
+                    },
+                  ),
+                  DialogOption(
+                    child: const Text('写长评', style: TextStyle(fontSize: 14)),
+                    onPressed: () => Get
+                      ..back()
+                      ..toNamed(
+                        '/webview',
+                        parameters: {
+                          'url':
+                              'https://member.bilibili.com/article-text/mobile?theme=${theme.isDark ? 1 : 0}&media_id=${widget.mediaId}',
+                        },
+                      ),
+                  ),
+                ],
+              ),
             ),
+            child: const Icon(Icons.edit),
           ),
-          child: const Icon(Icons.edit),
         ),
       ),
     );

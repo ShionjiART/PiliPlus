@@ -1,3 +1,5 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:PiliPlus/common/widgets/appbar/appbar.dart';
 import 'package:PiliPlus/common/widgets/flutter/pop_scope.dart';
 import 'package:PiliPlus/common/widgets/flutter/refresh_indicator.dart';
@@ -131,7 +133,7 @@ class _HistoryPageState extends State<HistoryPage>
                       ],
                     ),
                     Expanded(
-                      child: TabBarView(
+                      child: RailTabBarView(
                         physics: enableMultiSelect
                             ? const NeverScrollableScrollPhysics()
                             : tabBarScrollPhysics,
@@ -157,6 +159,7 @@ class _HistoryPageState extends State<HistoryPage>
   }
 
   AppBar get _buildAppBar => AppBar(
+    automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
     title: const Text('观看记录'),
     actions: [
       IconButton(

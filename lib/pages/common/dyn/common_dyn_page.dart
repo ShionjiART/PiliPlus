@@ -1,3 +1,6 @@
+import 'package:PiliPlus/common/widgets/native_comment_button.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:PiliPlus/common/skeleton/video_reply.dart';
 import 'package:PiliPlus/common/sliver_single_child_delegate.dart';
 import 'package:PiliPlus/common/style.dart';
@@ -293,6 +296,7 @@ mixin CommonDynPageMixin<T extends StatefulWidget>
       if (showBackBtn) {
         return SimpleScaffold(
           appBar: AppBar(
+            automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
             title: const Text('评论详情'),
             shape: Border(
               bottom: BorderSide(
@@ -318,7 +322,7 @@ mixin CommonDynPageMixin<T extends StatefulWidget>
       }
     }
 
-    Get.to(
+    Get.toSafe(
       replyReplyPage,
       routeName: 'dynamicDetail-Copy',
       arguments: arguments,
@@ -376,20 +380,22 @@ mixin CommonDynPageMixin<T extends StatefulWidget>
     child: replyButton,
   );
 
-  Widget get replyButton => FloatingActionButton(
-    heroTag: null,
-    onPressed: () {
-      try {
-        feedBack();
-        controller.onReply(
-          null,
-          oid: controller.oid,
-          replyType: controller.replyType,
-          mentionItem: controller.mentionItem,
-        );
-      } catch (_) {}
-    },
-    tooltip: '评论',
-    child: const Icon(Icons.reply),
+  Widget get replyButton => NativeCommentButton(
+    child: FloatingActionButton(
+      heroTag: null,
+      onPressed: () {
+        try {
+          feedBack();
+          controller.onReply(
+            null,
+            oid: controller.oid,
+            replyType: controller.replyType,
+            mentionItem: controller.mentionItem,
+          );
+        } catch (_) {}
+      },
+      tooltip: '评论',
+      child: const Icon(Icons.reply),
+    ),
   );
 }

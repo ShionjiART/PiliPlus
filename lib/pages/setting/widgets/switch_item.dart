@@ -17,6 +17,7 @@ class SetSwitchItem extends StatefulWidget {
   final EdgeInsetsGeometry? contentPadding;
   final TextStyle? titleStyle;
   final bool isSplit;
+  final bool enabled;
 
   const SetSwitchItem({
     super.key,
@@ -31,6 +32,7 @@ class SetSwitchItem extends StatefulWidget {
     this.contentPadding,
     this.titleStyle,
     this.isSplit = false,
+    this.enabled = true,
   });
 
   @override
@@ -59,6 +61,7 @@ class _SetSwitchItemState extends State<SetSwitchItem> {
   }
 
   Future<void> switchChange([bool? value]) async {
+    if (!widget.enabled) return;
     val = value ?? !val;
 
     if (val && widget.setKey == SettingBoxKey.badCertificateCallback) {
@@ -95,15 +98,19 @@ class _SetSwitchItemState extends State<SetSwitchItem> {
       scale: 0.8,
       alignment: .centerRight,
       child: Switch(
-        value: val,
-        onChanged: switchChange,
+        value: widget.enabled && val,
+        onChanged: widget.enabled ? switchChange : null,
       ),
     );
 
     Widget child(Widget? trailing) => ListTile(
       contentPadding: widget.contentPadding,
-      enabled: widget.onTap == null ? true : val,
-      onTap: widget.onTap == null ? switchChange : () => widget.onTap!(context),
+      enabled: widget.enabled && (widget.onTap == null ? true : val),
+      onTap: !widget.enabled
+          ? null
+          : widget.onTap == null
+          ? switchChange
+          : () => widget.onTap!(context),
       title: Text(widget.title, style: titleStyle),
       subtitle: widget.subtitle != null
           ? Text(widget.subtitle!, style: subTitleStyle)

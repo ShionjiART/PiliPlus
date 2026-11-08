@@ -1,3 +1,4 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
 import 'package:PiliPlus/common/skeleton/skeleton.dart';
 import 'package:PiliPlus/utils/global_data.dart';
 import 'package:material_ui/material_ui.dart';
@@ -16,7 +17,10 @@ class DynamicCardSkeleton extends StatelessWidget {
     );
     return Skeleton(
       child: Container(
-        padding: const EdgeInsets.only(left: 12, right: 12, top: 12),
+        padding: railPageInsets(
+          context,
+          const EdgeInsets.only(left: 12, right: 12, top: 12),
+        ),
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(

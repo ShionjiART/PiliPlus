@@ -1,3 +1,5 @@
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+
 import 'dart:async';
 
 import 'package:PiliPlus/common/assets.dart';
@@ -151,7 +153,7 @@ class _MediaPageState extends CommonPageState<MinePage>
     const padding = EdgeInsets.all(8);
     const style = ButtonStyle(tapTargetSize: .shrinkWrap);
     return PlayerBar(
-      left: widget.showBackBtn
+      left: widget.showBackBtn && !IOSNativeTabBar.hasNativeBack(context)
           ? const Padding(
               padding: EdgeInsets.only(left: 8),
               child: BackButton(),

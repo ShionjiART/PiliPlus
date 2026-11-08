@@ -1,3 +1,5 @@
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+
 import 'dart:async';
 import 'dart:io' show Platform;
 
@@ -93,6 +95,7 @@ class _DLNAPageState extends State<DLNAPage> {
     final colorScheme = ColorScheme.of(context);
     return SimpleScaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
         title: const Text('投屏'),
         actions: [
           IconButton(

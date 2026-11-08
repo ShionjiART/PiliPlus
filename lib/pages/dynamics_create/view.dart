@@ -1,3 +1,6 @@
+import 'package:PiliPlus/common/widgets/view_safe_area.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+
 import 'dart:math' show max;
 
 import 'package:PiliPlus/common/style.dart';
@@ -325,28 +328,29 @@ class _CreateDynPanelState extends CommonRichTextPubPageState<CreateDynPanel> {
     child: Stack(
       clipBehavior: Clip.none,
       children: [
-        Align(
-          alignment: Alignment.centerLeft,
-          child: SizedBox(
-            width: 34,
-            height: 34,
-            child: IconButton(
-              tooltip: '返回',
-              style: ButtonStyle(
-                padding: const WidgetStatePropertyAll(EdgeInsets.zero),
-                backgroundColor: WidgetStatePropertyAll(
-                  theme.colorScheme.secondaryContainer,
+        if (!IOSNativeTabBar.hasNativeBack(context))
+          Align(
+            alignment: Alignment.centerLeft,
+            child: SizedBox(
+              width: 34,
+              height: 34,
+              child: IconButton(
+                tooltip: '返回',
+                style: ButtonStyle(
+                  padding: const WidgetStatePropertyAll(EdgeInsets.zero),
+                  backgroundColor: WidgetStatePropertyAll(
+                    theme.colorScheme.secondaryContainer,
+                  ),
                 ),
-              ),
-              onPressed: Get.back,
-              icon: Icon(
-                Icons.arrow_back_outlined,
-                size: 18,
-                color: theme.colorScheme.onSecondaryContainer,
+                onPressed: Get.back,
+                icon: Icon(
+                  Icons.arrow_back_outlined,
+                  size: 18,
+                  color: theme.colorScheme.onSecondaryContainer,
+                ),
               ),
             ),
           ),
-        ),
         Center(
           child: Text(
             _isEdit ? '编辑动态' : '发布动态',
@@ -652,6 +656,7 @@ class _CreateDynPanelState extends CommonRichTextPubPageState<CreateDynPanel> {
       );
       final voteInfo = await Navigator.of(context).push<VoteInfo>(
         GetPageRoute(
+          middlewares: [SideSafeRouteMiddleware()],
           page: () => CreateVotePage(
             voteId: voteItem?.id == null ? null : int.parse(voteItem!.id!),
           ),
@@ -863,6 +868,7 @@ class _CreateDynPanelState extends CommonRichTextPubPageState<CreateDynPanel> {
   Future<void> _onReserve() async {
     final ReserveInfoData? reserveInfo = await Navigator.of(context).push(
       GetPageRoute(
+        middlewares: [SideSafeRouteMiddleware()],
         page: () => CreateReservePage(sid: _reserveCard.value?.id),
       ),
     );

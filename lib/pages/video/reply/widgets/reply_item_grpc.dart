@@ -1,3 +1,5 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
+
 import 'dart:math';
 
 import 'package:PiliPlus/common/assets.dart';
@@ -119,7 +121,7 @@ class ReplyItemGrpc extends StatelessWidget {
     );
 
     Widget child = Padding(
-      padding: const .fromLTRB(12, 14, 8, 5),
+      padding: railPageInsets(context, const EdgeInsets.fromLTRB(12, 14, 8, 5)),
       child: _buildContent(context, colorScheme),
     );
     if (needDivider) {

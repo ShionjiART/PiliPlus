@@ -1,3 +1,5 @@
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:PiliPlus/common/widgets/dialog/simple_dialog_option.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/loading_widget.dart';
 import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
@@ -42,6 +44,7 @@ class _WhisperSettingsPageState extends State<WhisperSettingsPage> {
     final ThemeData theme = Theme.of(context);
     return SimpleScaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
         title: Obx(() => Text(_controller.title.value)),
       ),
       body: Obx(() => _buildBody(theme, _controller.loadingState.value)),
@@ -68,7 +71,7 @@ class _WhisperSettingsPageState extends State<WhisperSettingsPage> {
     Setting item,
   ) {
     if (item.redirect.settingPage.hasParentSettingType()) {
-      Get.to(
+      Get.toSafe(
         WhisperSettingsPage(
           imSettingType: item.redirect.settingPage.parentSettingType,
           onUpdate: (value) {
@@ -137,7 +140,7 @@ class _WhisperSettingsPageState extends State<WhisperSettingsPage> {
       }
     } else if (item.redirect.settingPage.hasUrl()) {
       if (item.redirect.title == '消息屏蔽词') {
-        Get.to(const WhisperBlockPage());
+        Get.toSafe(const WhisperBlockPage());
       } else if (item.redirect.settingPage.url.startsWith('http')) {
         Get.toNamed(
           '/webview',

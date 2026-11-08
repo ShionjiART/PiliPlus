@@ -1,3 +1,4 @@
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:PiliPlus/common/widgets/reorder_mixin.dart';
 import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
 import 'package:PiliPlus/http/follow.dart';
@@ -39,6 +40,7 @@ class _FollowTagSortPageState extends State<FollowTagSortPage>
   Widget build(BuildContext context) {
     return SimpleScaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
         title: const Text('关注分组排序'),
         actions: _customTags.isNotEmpty
             ? [

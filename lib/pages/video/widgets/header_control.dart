@@ -1,3 +1,5 @@
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+
 import 'dart:async' show Timer;
 import 'dart:convert' show jsonDecode, utf8;
 import 'dart:io' show Platform, File;
@@ -347,7 +349,7 @@ class HeaderControlState extends State<HeaderControl>
   @override
   bool get isPortrait => widget.isPortrait;
   @override
-  late final horizontalScreen = videoDetailCtr.horizontalScreen;
+  bool get horizontalScreen => videoDetailCtr.horizontalScreen;
 
   Box setting = GStorage.setting;
 
@@ -1729,22 +1731,25 @@ class HeaderControlState extends State<HeaderControl>
             left: Row(
               mainAxisSize: .min,
               children: [
-                SizedBox(
-                  width: btnWidth,
-                  height: btnHeight,
-                  child: IconButton(
-                    tooltip: '返回',
-                    style: btnStyle,
-                    icon: const Icon(
-                      FontAwesomeIcons.arrowLeft,
-                      size: 15,
-                      color: Colors.white,
+                if (!IOSNativeTabBar.usesNativeVideoNavigation(context) &&
+                    !IOSNativeTabBar.hasNativeBack(context))
+                  SizedBox(
+                    width: btnWidth,
+                    height: btnHeight,
+                    child: IconButton(
+                      tooltip: '返回',
+                      style: btnStyle,
+                      icon: const Icon(
+                        FontAwesomeIcons.arrowLeft,
+                        size: 15,
+                        color: Colors.white,
+                      ),
+                      onPressed: () => plPlayerController
+                          .onPopInvokedWithResult(false, null),
                     ),
-                    onPressed: () =>
-                        plPlayerController.onPopInvokedWithResult(false, null),
                   ),
-                ),
-                if (!plPlayerController.isDesktopPip &&
+                if (!IOSNativeTabBar.usesNativeVideoNavigation(context) &&
+                    !plPlayerController.isDesktopPip &&
                     (!isFullScreen || !isPortrait))
                   SizedBox(
                     width: btnWidth,

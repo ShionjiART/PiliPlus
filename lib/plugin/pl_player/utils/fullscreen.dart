@@ -23,6 +23,11 @@ void exitDesktopFullScreen() {
 }
 
 List<DeviceOrientation>? _lastOrientation;
+
+/// Native hinge geometry can change without a SystemChrome call. The next
+/// explicit player/manual direction request must not be skipped as "unchanged".
+void invalidatePreferredOrientationCache() => _lastOrientation = null;
+
 Future<void>? _setPreferredOrientations(List<DeviceOrientation> orientations) {
   if (_lastOrientation == orientations) {
     return null;

@@ -1,3 +1,6 @@
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
+
 import 'dart:async';
 
 import 'package:PiliPlus/common/widgets/appbar/appbar.dart';
@@ -142,6 +145,9 @@ class _DownloadPageState extends State<DownloadPage>
             ctr: _controller,
             actions: [updateBtn()],
             child: AppBar(
+              automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(
+                context,
+              ),
               title: const Text('离线缓存'),
               actions: [
                 IconButton(
@@ -149,7 +155,7 @@ class _DownloadPageState extends State<DownloadPage>
                   onPressed: () async {
                     await downloadService.waitForInitialization;
                     if (!mounted) return;
-                    Get.to(DownloadSearchPage(progress: _progress));
+                    Get.toSafe(DownloadSearchPage(progress: _progress));
                   },
                   icon: const Icon(Icons.search),
                 ),

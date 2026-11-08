@@ -1,3 +1,5 @@
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+
 import 'dart:math';
 
 import 'package:PiliPlus/common/assets.dart';
@@ -89,6 +91,9 @@ class _SearchTrendingPageState extends State<SearchTrendingPage> {
                 final scrollRatio = _scrollRatio.value;
                 final flag = maxWidth > width || scrollRatio >= 0.5;
                 return AppBar(
+                  automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(
+                    context,
+                  ),
                   title: Opacity(
                     opacity: scrollRatio,
                     child: Text(

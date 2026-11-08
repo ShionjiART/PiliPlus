@@ -1,3 +1,5 @@
+import 'package:PiliPlus/utils/extension/get_ext.dart';
+
 import 'dart:convert';
 
 import 'package:PiliPlus/common/assets.dart';
@@ -215,7 +217,7 @@ class WhisperSessionItem extends StatelessWidget {
             _ => null,
           };
           if (sessionPageType != null) {
-            Get.to(
+            Get.toSafe(
               WhisperSecPage(
                 name: item.sessionInfo.sessionName,
                 sessionPageType: sessionPageType,

@@ -1,3 +1,5 @@
+import 'package:PiliPlus/common/widgets/view_safe_area.dart';
+
 import 'dart:math';
 
 import 'package:PiliPlus/common/widgets/fractionally_sized_box.dart';
@@ -53,12 +55,14 @@ abstract final class PageUtils {
   }) {
     return Get.key.currentState!.push<void>(
       HeroDialogRoute(
-        pageBuilder: (context, animation, secondaryAnimation) => GalleryViewer(
-          sources: imgList,
-          initIndex: initialPage,
-          quality: quality ?? GlobalData().imgQuality,
-          onPageChanged: onPageChanged,
-          tag: tag,
+        pageBuilder: (context, animation, secondaryAnimation) => SideSafeArea(
+          child: GalleryViewer(
+            sources: imgList,
+            initIndex: initialPage,
+            quality: quality ?? GlobalData().imgQuality,
+            onPageChanged: onPageChanged,
+            tag: tag,
+          ),
         ),
       ),
     );
@@ -89,7 +93,10 @@ abstract final class PageUtils {
 
     if (userList.isEmpty && context.mounted) {
       final UserModel? userModel = await Navigator.of(context).push(
-        GetPageRoute(page: () => const ContactPage()),
+        GetPageRoute(
+          middlewares: [SideSafeRouteMiddleware()],
+          page: () => const ContactPage(),
+        ),
       );
       if (userModel != null) {
         userList.add(userModel);

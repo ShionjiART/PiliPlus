@@ -1,3 +1,5 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:PiliPlus/common/widgets/button/icon_button.dart';
 import 'package:PiliPlus/common/widgets/dialog/dialog.dart';
 import 'package:PiliPlus/common/widgets/flutter/refresh_indicator.dart';
@@ -43,6 +45,7 @@ abstract class BaseVideoWebState<
     final colorScheme = ColorScheme.of(context);
     return SimpleScaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
         title: Text(name),
         actions: [
           Obx(
@@ -120,7 +123,10 @@ abstract class BaseVideoWebState<
     return SliverPinnedHeader(
       backgroundColor: colorScheme.surface,
       child: Padding(
-        padding: const .fromLTRB(14, 0, 8, 4),
+        padding: railPageInsets(
+          context,
+          const EdgeInsets.fromLTRB(14, 0, 8, 4),
+        ),
         child: Stack(
           clipBehavior: .none,
           alignment: .centerLeft,

@@ -26,6 +26,7 @@ class DynamicDetailController extends CommonDynController
   @override
   late int replyType;
   late DynamicItemModel dynItem;
+  final replyMetadataReady = false.obs;
   @override
   MentionItem? get mentionItem => dynItem.modules.moduleAuthor?.mentionItem;
 
@@ -57,6 +58,7 @@ class DynamicDetailController extends CommonDynController
   void _init(String commentIdStr, int commentType) {
     oid = int.parse(commentIdStr);
     replyType = commentType;
+    replyMetadataReady.value = true;
     queryData();
   }
 

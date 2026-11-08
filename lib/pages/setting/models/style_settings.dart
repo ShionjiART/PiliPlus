@@ -16,6 +16,8 @@ import 'package:PiliPlus/models/common/bar_hide_type.dart';
 import 'package:PiliPlus/models/common/dynamic/dynamic_badge_mode.dart';
 import 'package:PiliPlus/models/common/dynamic/up_panel_position.dart';
 import 'package:PiliPlus/models/common/home_tab_type.dart';
+import 'package:PiliPlus/models/common/horizontal_screen_mode.dart';
+import 'package:PiliPlus/models/common/inner_video_detail_layout.dart';
 import 'package:PiliPlus/models/common/member/tab_type.dart';
 import 'package:PiliPlus/models/common/mine_tab_type.dart';
 import 'package:PiliPlus/models/common/msg/msg_unread_type.dart';
@@ -37,6 +39,8 @@ import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:PiliPlus/utils/extension/num_ext.dart';
 import 'package:PiliPlus/utils/extension/theme_ext.dart';
 import 'package:PiliPlus/utils/global_data.dart';
+import 'package:PiliPlus/utils/ios/foldable_helper.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:PiliPlus/utils/path_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
@@ -68,20 +72,52 @@ List<SettingsModel> get styleSettings => [
     ),
   ],
   if (Platform.isLinux) _useSSDModel(),
+  // iPhone 上与折叠屏自动模式合并为一项，避免两个开关互相覆盖
+  if (IOSFoldableHelper.isIPhone)
+    PopupModel(
+      title: '横屏适配',
+      leading: const Icon(Icons.phonelink_outlined),
+      value: () => Pref.horizontalScreenMode,
+      items: HorizontalScreenMode.values,
+      onSelected: (value, setState) {
+        GStorage.setting
+            .putAll({
+              SettingBoxKey.foldableAutoHorizontal: value == .auto,
+              if (value != .auto) SettingBoxKey.horizontalScreen: value == .on,
+            })
+            .whenComplete(() {
+              _onHorizontalScreenChanged();
+              setState();
+            });
+      },
+    )
+  else
+    SwitchModel(
+      title: '横屏适配',
+      subtitle: '启用横屏布局与逻辑，平板、折叠屏等可开启；建议全屏方向设为【不改变当前方向】',
+      leading: const Icon(Icons.phonelink_outlined),
+      setKey: SettingBoxKey.horizontalScreen,
+      defaultVal: Pref.horizontalScreen,
+      onChanged: _onHorizontalScreenChanged,
+    ),
+  if (IOSFoldableHelper.isIPhone)
+    PopupModel(
+      title: '内屏视频详情布局',
+      leading: const Icon(Icons.vertical_split_outlined),
+      value: () => Pref.innerVideoDetailLayout,
+      items: InnerVideoDetailLayout.values,
+      onSelected: (value, setState) => GStorage.setting
+          .put(SettingBoxKey.innerVideoDetailLayout, value.index)
+          .whenComplete(setState),
+    ),
   SwitchModel(
-    title: '横屏适配',
-    subtitle: '启用横屏布局与逻辑，平板、折叠屏等可开启；建议全屏方向设为【不改变当前方向】',
-    leading: const Icon(Icons.phonelink_outlined),
-    setKey: SettingBoxKey.horizontalScreen,
-    defaultVal: Pref.horizontalScreen,
-    onChanged: _onHorizontalScreenChanged,
-  ),
-  const SwitchModel(
     title: '改用侧边栏',
     subtitle: '开启后底栏与顶栏被替换，且相关设置失效',
     leading: Icon(Icons.chrome_reader_mode_outlined),
     setKey: SettingBoxKey.useSideBar,
     defaultVal: false,
+    disabledWhen: IOSNativeTabBar.rightRailDevice,
+    disabledSubtitle: '此机型使用系统右侧竖栏，已停用此选项',
     needReboot: true,
   ),
   const SwitchModel(
@@ -903,8 +939,11 @@ Widget _themeTrailing(ThemeData theme) {
   );
 }
 
-void _onHorizontalScreenChanged(bool value) {
-  if (value) {
+// 设置已在回调前写入，按生效后的值（含折叠屏自动模式）刷新方向
+void _onHorizontalScreenChanged([bool? _]) {
+  if (IOSFoldableHelper.isIPhone) {
+    IOSFoldableHelper.applyOrientation();
+  } else if (Pref.horizontalScreen) {
     fullMode();
   } else {
     portraitUpMode();

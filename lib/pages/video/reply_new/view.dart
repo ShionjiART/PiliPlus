@@ -1,3 +1,5 @@
+import 'package:PiliPlus/utils/extension/get_ext.dart';
+
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' show max;
@@ -281,7 +283,7 @@ class _ReplyPageState extends CommonRichTextPubPageState<ReplyPage> {
         children: [
           item(
             onTap: () async {
-              final ({String title, String url})? res = await Get.to(
+              final ({String title, String url})? res = await Get.toSafe(
                 ReplySearchPage(type: widget.replyType, oid: widget.oid),
               );
               if (res != null) {

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:PiliPlus/common/widgets/view_safe_area.dart';
+import 'package:PiliPlus/common/widgets/home_tools_slot.dart';
 import 'package:PiliPlus/grpc/dyn.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/msg.dart';
@@ -37,6 +38,11 @@ class MainController extends GetxController
   late final bool hideBottomBar;
   late final barHideType = Pref.barHideType;
   bool useBottomNav = false;
+  // iPhone Duo：导航放在右侧系统状态栏中
+  bool useStatusBarNav = false;
+  // iOS 26+ iPhone：主导航由系统液态玻璃标签栏绘制
+  bool useNativeTabBar = false;
+  final homeToolsPlacement = ValueNotifier(HomeToolsPlacement.top);
   late dynamic controller;
   final RxInt selectedIndex = 0.obs;
 
@@ -59,7 +65,7 @@ class MainController extends GetxController
 
   final enableMYBar = Pref.enableMYBar;
   final floatingNavBar = Pref.floatingNavBar;
-  final useSideBar = Pref.useSideBar;
+  bool get useSideBar => Pref.useSideBar;
   final hideSideBarLabel = Pref.hideSideBarLabel;
   final mainTabBarView = Pref.mainTabBarView;
   late final optTabletNav = Pref.optTabletNav;
@@ -277,7 +283,7 @@ class MainController extends GetxController
     if (_mineIndex != -1) {
       setIndex(_mineIndex!);
     } else {
-      Get.to(
+      Get.toSafe(
         const Material(
           child: ViewSafeArea(
             top: true,
@@ -346,6 +352,7 @@ class MainController extends GetxController
 
   @override
   void onClose() {
+    homeToolsPlacement.dispose();
     barOffset?.close();
     controller.dispose();
     super.onClose();

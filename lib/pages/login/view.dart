@@ -1,3 +1,4 @@
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:PiliPlus/common/constants.dart';
 import 'package:PiliPlus/common/dial_prefix.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
@@ -522,11 +523,14 @@ class _LoginPageState extends State<LoginPage> {
     final isLandscape = !MediaQuery.sizeOf(context).isPortrait;
     return SimpleScaffold(
       appBar: AppBar(
-        leading: IconButton(
-          tooltip: '关闭',
-          icon: const Icon(Icons.close_outlined),
-          onPressed: Get.back,
-        ),
+        automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
+        leading: IOSNativeTabBar.hasNativeBack(context)
+            ? null
+            : IconButton(
+                tooltip: '关闭',
+                icon: const Icon(Icons.close_outlined),
+                onPressed: Get.back,
+              ),
         title: Row(
           children: [
             const Text('登录'),

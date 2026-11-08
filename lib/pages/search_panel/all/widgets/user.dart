@@ -1,3 +1,5 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
+
 import 'dart:io' show Platform;
 
 import 'package:PiliPlus/common/style.dart';
@@ -44,7 +46,10 @@ class SearchAllUserItem extends StatelessWidget {
           InkWell(
             onTap: () => Get.toNamed('/member?mid=${item.mid}'),
             child: Padding(
-              padding: const .symmetric(horizontal: 12, vertical: 5),
+              padding: railPageInsets(
+                context,
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+              ),
               child: Row(
                 spacing: 10,
                 children: [

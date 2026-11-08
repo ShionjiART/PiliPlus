@@ -1,3 +1,5 @@
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+
 import 'dart:async';
 
 import 'package:PiliPlus/common/widgets/animated_height.dart';
@@ -289,28 +291,29 @@ class _RepostPanelState extends CommonRichTextPubPageState<RepostPanel>
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: SizedBox(
-                  width: 34,
-                  height: 34,
-                  child: IconButton(
-                    tooltip: '返回',
-                    style: ButtonStyle(
-                      padding: const WidgetStatePropertyAll(EdgeInsets.zero),
-                      backgroundColor: WidgetStatePropertyAll(
-                        theme.colorScheme.secondaryContainer,
+              if (!IOSNativeTabBar.hasNativeBack(context))
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: SizedBox(
+                    width: 34,
+                    height: 34,
+                    child: IconButton(
+                      tooltip: '返回',
+                      style: ButtonStyle(
+                        padding: const WidgetStatePropertyAll(EdgeInsets.zero),
+                        backgroundColor: WidgetStatePropertyAll(
+                          theme.colorScheme.secondaryContainer,
+                        ),
                       ),
-                    ),
-                    onPressed: Get.back,
-                    icon: Icon(
-                      Icons.arrow_back_outlined,
-                      size: 18,
-                      color: theme.colorScheme.onSecondaryContainer,
+                      onPressed: Get.back,
+                      icon: Icon(
+                        Icons.arrow_back_outlined,
+                        size: 18,
+                        color: theme.colorScheme.onSecondaryContainer,
+                      ),
                     ),
                   ),
                 ),
-              ),
               Center(
                 child: Text(
                   widget.rid != null ? '分享至动态' : '转发动态',

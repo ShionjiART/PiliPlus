@@ -1,3 +1,5 @@
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:PiliPlus/common/widgets/custom_icon.dart';
 import 'package:PiliPlus/common/widgets/flutter/list_tile.dart';
 import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
@@ -111,6 +113,7 @@ class _SettingPageState extends State<SettingPage> {
   Widget build(BuildContext context) {
     return SimpleScaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
         title: _isPortrait ? const Text('设置') : Text(_type.title),
       ),
       body: ViewSafeArea(
@@ -151,7 +154,7 @@ class _SettingPageState extends State<SettingPage> {
 
   void _toPage(SettingType type) {
     if (_isPortrait) {
-      Get.to(
+      Get.toSafe(
         () => switch (type) {
           .webdavSetting => const WebDavSettingPage(),
           .about => const AboutPage(),

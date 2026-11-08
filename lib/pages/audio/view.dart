@@ -1,3 +1,5 @@
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+
 import 'dart:math' show min;
 
 import 'package:PiliPlus/common/assets.dart';
@@ -99,6 +101,7 @@ class _AudioPageState extends State<AudioPage> {
     final padding = MediaQuery.viewPaddingOf(context);
     return SimpleScaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
         actions: [
           if (_controller.isUgc && _controller.enableSponsorBlock)
             Obx(() {

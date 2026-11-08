@@ -1,3 +1,9 @@
+import 'package:PiliPlus/common/widgets/appbar/rail_floating_app_bar.dart';
+import 'package:PiliPlus/common/widgets/native_comment_button.dart';
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
+import 'package:PiliPlus/utils/ios/native_page_actions.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+
 import 'dart:async';
 import 'dart:math';
 
@@ -95,30 +101,219 @@ class _DynamicDetailPageState extends CommonDynPageMultiState<DynamicDetailPage>
       () => DynLikeController(id, count: stat?.like?.count ?? -1),
       tag: id,
     );
+    _nativeWorkers.addAll([
+      ever(controller.count, (_) => _scheduleNativeActions()),
+      ever(controller.replyMetadataReady, (_) => _scheduleNativeActions()),
+    ]);
   }
 
   ScrollableState? _scrollable;
+  ModalRoute<dynamic>? _nativeRoute;
+  final _pageScroll = ScrollController();
+  final _horizontalReplyScroll = ScrollController();
+  final _nestedScrollKey = GlobalKey<NestedScrollViewState>();
+  final List<Worker> _nativeWorkers = [];
+  bool _nativeUpdateScheduled = false;
+  bool _canScrollToTop = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != _nativeRoute) {
+      if (_nativeRoute case final previous?) {
+        IOSNativeTabBar.removePageActions(previous);
+      }
+      _nativeRoute = route;
+    }
+    _scheduleNativeActions();
+  }
+
+  void _scheduleNativeActions() {
+    if (_nativeUpdateScheduled) return;
+    _nativeUpdateScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _nativeUpdateScheduled = false;
+      if (mounted && _nativeRoute != null) _publishNativeActions();
+    });
+  }
+
+  String? _countLabel(int? value) =>
+      value == null || value < 0 ? null : NumUtils.numFormat(value);
+
+  void _publishNativeActions() {
+    final stat = controller.dynItem.modules.moduleStat;
+    IOSNativeTabBar.setPageActions(
+      route: _nativeRoute!,
+      actions: [
+        if (_canScrollToTop)
+          const NativePageAction(id: 'scrollToTop', title: '回到顶部'),
+        if (controller.showDynActionBar) ...[
+          NativePageAction(
+            id: 'like',
+            title: '点赞',
+            count: _countLabel(stat?.like?.count),
+            selected: stat?.like?.status ?? false,
+          ),
+          NativePageAction(
+            id: 'comment',
+            title: '查看评论',
+            count: _countLabel(
+              controller.count.value >= 0
+                  ? controller.count.value
+                  : stat?.comment?.count,
+            ),
+          ),
+          NativePageAction(
+            id: 'repost',
+            title: '转发',
+            enabled: controller.replyMetadataReady.value,
+            count: _countLabel(stat?.forward?.count),
+          ),
+          const NativePageAction(id: 'share', title: '分享'),
+        ],
+      ],
+      onAction: _onNativeAction,
+    );
+  }
+
+  Future<void> _onNativeAction(String id) async {
+    if (!mounted || !(_nativeRoute?.isCurrent ?? false)) return;
+    switch (id) {
+      case 'scrollToTop':
+        await _scrollToTop();
+      case 'like':
+        await RequestUtils.onLikeDynamic(
+          controller.dynItem,
+          controller.dynItem.modules.moduleStat?.like?.status ?? false,
+          () {
+            if (mounted) setState(() {});
+          },
+        );
+      case 'comment':
+        _jumpToComment();
+      case 'repost':
+        await _showRepostPanel();
+      case 'share':
+        await ShareUtils.shareText(
+          '${HttpString.opusBaseUrl}/${controller.dynItem.idStr}',
+        );
+    }
+    if (mounted) _scheduleNativeActions();
+  }
+
+  Future<void> _showRepostPanel() async {
+    final item = controller.dynItem;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => RepostPanel(
+        item: item,
+        onSuccess: () {
+          final forward = item.modules.moduleStat?.forward;
+          if (forward != null) forward.count = (forward.count ?? 0) + 1;
+          if (mounted) setState(() {});
+        },
+        replyInfo: (oid: controller.oid, replyType: controller.replyType),
+        mentionItem: item.modules.moduleAuthor?.mentionItem,
+      ),
+    );
+  }
+
+  bool _onPageScroll(ScrollNotification notification) {
+    final positions = [
+      ..._pageScroll.positions,
+      ...?_nestedScrollKey.currentState?.innerController.positions,
+      ..._horizontalReplyScroll.positions,
+    ];
+    final canScroll =
+        positions.any((position) => position.pixels > 40) ||
+        (notification.metrics.axis == Axis.vertical &&
+            notification.metrics.pixels > 40);
+    if (canScroll != _canScrollToTop) {
+      _canScrollToTop = canScroll;
+      _scheduleNativeActions();
+    }
+    return false;
+  }
+
+  Future<void> _scrollToTop() async {
+    if (isPortrait) {
+      // NestedScrollView's outer position coordinates the inner positions too.
+      if (_pageScroll.hasClients) {
+        await _pageScroll.animateTo(
+          0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    } else {
+      final positions = <ScrollPosition>{
+        ..._pageScroll.positions,
+        ..._horizontalReplyScroll.positions,
+        ...?PrimaryScrollController.maybeOf(context)?.positions,
+      };
+      await Future.wait(
+        positions.map(
+          (position) => position.animateTo(
+            position.minScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          ),
+        ),
+      );
+    }
+    if (mounted) {
+      _canScrollToTop = false;
+      _scheduleNativeActions();
+    }
+  }
 
   @override
   void dispose() {
+    if (_nativeRoute case final route?) {
+      IOSNativeTabBar.removePageActions(route);
+    }
+    for (final worker in _nativeWorkers) {
+      worker.dispose();
+    }
+    _pageScroll.dispose();
+    _horizontalReplyScroll.dispose();
     _scrollable = null;
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return SelectionTapRegionSurface(
-      /// apply `lib/scripts/scrollable.patch`
-      isScrolling: () => _scrollable?.shouldIgnorePointer ?? false,
-      child: SimpleScaffold(
-        appBar: _buildAppBar(),
-        body: Padding(
-          padding: EdgeInsets.only(left: padding.left, right: padding.right),
-          child: _buildBody(),
-        ),
-        fab: SlideTransition(
-          position: fabAnimation,
-          child: _buildBottom(),
+    _scheduleNativeActions();
+    final overlayHeader =
+        isPortrait && (RailViewportScope.of(context)?.normalizedTop ?? false);
+    return NotificationListener<ScrollNotification>(
+      onNotification: _onPageScroll,
+      child: SelectionTapRegionSurface(
+        /// apply `lib/scripts/scrollable.patch`
+        isScrolling: () => _scrollable?.shouldIgnorePointer ?? false,
+        child: SimpleScaffold(
+          overlayAppBar: overlayHeader,
+          appBar: Obx(
+            () => RailFloatingAppBar(
+              overlay: overlayHeader,
+              visible: controller.showTitle.value,
+              child: _buildAppBar(),
+            ),
+          ),
+          body: Padding(
+            padding: EdgeInsets.only(left: padding.left, right: padding.right),
+            child: _buildBody(),
+          ),
+          fab: CommentFabTransition(
+            position: fabAnimation,
+            child:
+                IOSNativeTabBar.enabled && IOSNativeTabBar.rightRailDevice.value
+                ? fabButton
+                : _buildBottom(),
+          ),
         ),
       ),
     );
@@ -260,6 +455,7 @@ class _DynamicDetailPageState extends CommonDynPageMultiState<DynamicDetailPage>
   }
 
   PreferredSizeWidget _buildAppBar() => AppBar(
+    automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
     title: Padding(
       padding: const EdgeInsets.only(right: 12),
       child: Obx(
@@ -341,7 +537,8 @@ class _DynamicDetailPageState extends CommonDynPageMultiState<DynamicDetailPage>
 
   Widget _buildTabBody([bool isPortrait = true]) {
     Widget reply = CustomScrollView(
-      primary: true,
+      controller: isPortrait ? null : _horizontalReplyScroll,
+      primary: isPortrait,
       key: const PageStorageKey(DynType.reply),
       physics: ReloadScrollPhysics(
         controller: controller,
@@ -356,7 +553,7 @@ class _DynamicDetailPageState extends CommonDynPageMultiState<DynamicDetailPage>
       reply = refreshIndicator(onRefresh: controller.onRefresh, child: reply);
     }
 
-    final child = TabBarView(
+    final child = RailTabBarView(
       controller: tabController,
       hitTestBehavior: .translucent,
       physics: const NeverScrollableScrollPhysics(),
@@ -423,6 +620,8 @@ class _DynamicDetailPageState extends CommonDynPageMultiState<DynamicDetailPage>
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: padding),
       child: NestedScrollView(
+        key: _nestedScrollKey,
+        controller: _pageScroll,
         scrollBehavior: const NoOverscrollIndicator(),
         headerSliverBuilder: (context, innerBoxIsScrolled) {
           return [_buildDynPanel()];
@@ -446,12 +645,15 @@ class _DynamicDetailPageState extends CommonDynPageMultiState<DynamicDetailPage>
         Expanded(
           flex: flex,
           child: CustomScrollView(
-            primary: true,
+            controller: _pageScroll,
+            primary: false,
             slivers: [
               SliverPadding(
                 padding: .only(
                   left: padding,
-                  bottom: this.padding.bottom + 100,
+                  bottom:
+                      this.padding.bottom +
+                      (IOSNativeTabBar.hasNativeActions(context) ? 16 : 100),
                 ),
                 sliver: _buildDynPanel(),
               ),
@@ -461,7 +663,16 @@ class _DynamicDetailPageState extends CommonDynPageMultiState<DynamicDetailPage>
         Expanded(
           flex: flex1,
           child: Padding(
-            padding: EdgeInsets.only(right: padding),
+            // The native rail already reserves its side safe area, shared with
+            // the back button above. Keep this based on geometry, even while
+            // a popup temporarily takes over the native action items.
+            padding: EdgeInsets.only(
+              right:
+                  IOSNativeTabBar.enabled &&
+                      (IOSNativeTabBar.safeArea.value?.right ?? 0) >= 72
+                  ? 0
+                  : padding,
+            ),
             child: MiniScaffold(
               body: Column(
                 children: [
@@ -669,10 +880,18 @@ class _DynamicDetailPageState extends CommonDynPageMultiState<DynamicDetailPage>
   }
 
   void _jumpToComment([_]) {
-    if (!isPortrait) return;
-    try {
-      final position = PrimaryScrollController.of(context).position;
-      position.jumpTo(position.maxScrollExtent);
-    } catch (_) {}
+    tabController.animateTo(DynType.reply.index);
+    if (isPortrait) {
+      for (final position in _pageScroll.positions) {
+        position.jumpTo(position.maxScrollExtent);
+      }
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        for (final position in _horizontalReplyScroll.positions) {
+          position.jumpTo(position.minScrollExtent);
+        }
+      });
+    }
   }
 }

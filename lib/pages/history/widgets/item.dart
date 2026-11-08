@@ -1,3 +1,4 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
 import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/select_mask.dart';
@@ -52,9 +53,11 @@ class HistoryItem extends StatelessWidget {
           clipBehavior: Clip.none,
           children: [
             Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: Style.safeSpace,
-                vertical: 5,
+              padding: EdgeInsets.fromLTRB(
+                Style.safeSpace,
+                5,
+                railTrailingSpace(context, Style.safeSpace),
+                5,
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,

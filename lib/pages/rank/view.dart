@@ -1,3 +1,4 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
 import 'package:PiliPlus/common/widgets/flutter/vertical_tabs.dart';
 import 'package:PiliPlus/models/common/rank_type.dart';
 import 'package:PiliPlus/pages/rank/controller.dart';
@@ -27,7 +28,7 @@ class _RankPageState extends State<RankPage>
       children: [
         _buildTab(theme),
         Expanded(
-          child: TabBarView(
+          child: RailTabBarView(
             physics: const NeverScrollableScrollPhysics(),
             controller: _rankController.tabController,
             children: RankType.values

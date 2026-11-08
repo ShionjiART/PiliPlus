@@ -1,3 +1,4 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
 // 内容
 import 'package:PiliPlus/common/widgets/custom_icon.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
@@ -37,7 +38,7 @@ Widget content(
       moduleDynamic?.desc?.text ?? moduleDynamic?.major?.opus?.summary?.text;
   return Padding(
     padding: floor == 1
-        ? const EdgeInsets.fromLTRB(12, 0, 12, 6)
+        ? railPageInsets(context, const EdgeInsets.fromLTRB(12, 0, 12, 6))
         : const EdgeInsets.only(bottom: 6),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,

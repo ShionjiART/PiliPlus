@@ -1,3 +1,4 @@
+import 'package:PiliPlus/common/widgets/view_safe_area.dart';
 import 'package:PiliPlus/common/widgets/button/icon_button.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/self_sized_horizontal_list.dart';
@@ -178,7 +179,10 @@ class _SharePanelState extends State<SharePanel> {
                     _focusNode.unfocus();
                     final UserModel? userModel = await Navigator.of(context)
                         .push(
-                          GetPageRoute(page: () => const ContactPage()),
+                          GetPageRoute(
+                            middlewares: [SideSafeRouteMiddleware()],
+                            page: () => const ContactPage(),
+                          ),
                         );
                     if (userModel != null) {
                       _userList

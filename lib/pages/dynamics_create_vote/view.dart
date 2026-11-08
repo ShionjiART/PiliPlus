@@ -1,3 +1,5 @@
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+
 import 'dart:io' show File;
 
 import 'package:PiliPlus/common/widgets/button/icon_button.dart';
@@ -56,6 +58,7 @@ class _CreateVotePageState extends State<CreateVotePage> {
     );
     return SimpleScaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
         title: Text('${_controller.voteId != null ? '' : '发起'}投票'),
       ),
       body: ListView(

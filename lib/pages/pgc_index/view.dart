@@ -1,3 +1,5 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/animated_height.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
@@ -47,7 +49,12 @@ class _PgcIndexPageState extends State<PgcIndexPage>
     final theme = Theme.of(context);
     return widget.indexType == null
         ? SimpleScaffold(
-            appBar: AppBar(title: const Text('索引')),
+            appBar: AppBar(
+              automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(
+                context,
+              ),
+              title: const Text('索引'),
+            ),
             body: Obx(() => _buildBody(theme, _ctr.conditionState.value)),
           )
         : Obx(() => _buildBody(theme, _ctr.conditionState.value));
@@ -88,7 +95,7 @@ class _PgcIndexPageState extends State<PgcIndexPage>
                 SliverPadding(
                   padding: EdgeInsets.only(
                     left: Style.safeSpace,
-                    right: Style.safeSpace,
+                    right: railTrailingSpace(context, Style.safeSpace),
                     top: 12,
                     bottom: padding.bottom + 100,
                   ),

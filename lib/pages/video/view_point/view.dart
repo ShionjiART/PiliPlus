@@ -1,3 +1,4 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
 import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/button/icon_button.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
@@ -127,7 +128,12 @@ class _ViewPointsPageState extends State<ViewPointsPage>
               }
             : null,
         child: Padding(
-          padding: const .symmetric(horizontal: Style.safeSpace, vertical: 5),
+          padding: EdgeInsets.fromLTRB(
+            Style.safeSpace,
+            5,
+            railTrailingSpace(context, Style.safeSpace),
+            5,
+          ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

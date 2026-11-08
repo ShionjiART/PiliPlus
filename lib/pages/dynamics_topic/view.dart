@@ -1,3 +1,4 @@
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:PiliPlus/common/assets.dart';
 import 'package:PiliPlus/common/widgets/custom_icon.dart';
 import 'package:PiliPlus/common/widgets/dynamic_sliver_app_bar/dynamic_sliver_app_bar.dart';
@@ -175,7 +176,9 @@ class _DynTopicPageState extends State<DynTopicPage>
     LoadingState<TopDetails?> topState,
   ) {
     return switch (topState) {
-      Loading() => const SliverAppBar(),
+      Loading() => SliverAppBar(
+        automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
+      ),
       Success(:final response) when response != null => DynamicSliverAppBar.medium(
         onPerformLayout: (value) => _controller.appbarOffset =
             value.height - kToolbarHeight - padding.top,
@@ -348,6 +351,7 @@ class _DynTopicPageState extends State<DynTopicPage>
         ],
       ),
       _ => SliverAppBar(
+        automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
         pinned: true,
         title: Text(_controller.topicName),
       ),

@@ -1,3 +1,6 @@
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
+
 import 'dart:io' show Platform;
 import 'dart:math' as math;
 
@@ -129,6 +132,9 @@ class _MemberPageState extends State<MemberPage> {
               }
               return [
                 SliverAppBar(
+                  automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(
+                    context,
+                  ),
                   pinned: true,
                   actions: _actions(theme),
                   title: GestureDetector(
@@ -467,7 +473,7 @@ class _MemberPageState extends State<MemberPage> {
                 ),
               ),
             PopupMenuItem(
-              onTap: () => Get.to(const LoginDevicesPage()),
+              onTap: () => Get.toSafe(const LoginDevicesPage()),
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -478,7 +484,7 @@ class _MemberPageState extends State<MemberPage> {
               ),
             ),
             PopupMenuItem(
-              onTap: () => Get.to(
+              onTap: () => Get.toSafe(
                 const LogPage(),
                 arguments: LoginLogController(),
               ),
@@ -492,7 +498,7 @@ class _MemberPageState extends State<MemberPage> {
               ),
             ),
             PopupMenuItem(
-              onTap: () => Get.to(
+              onTap: () => Get.toSafe(
                 const LogPage(),
                 arguments: CoinLogController(),
               ),
@@ -506,7 +512,7 @@ class _MemberPageState extends State<MemberPage> {
               ),
             ),
             PopupMenuItem(
-              onTap: () => Get.to(
+              onTap: () => Get.toSafe(
                 const LogPage(),
                 arguments: ExpLogController(),
               ),

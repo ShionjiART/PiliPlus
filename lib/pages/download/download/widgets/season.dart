@@ -1,3 +1,5 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/badge.dart';
 import 'package:PiliPlus/common/widgets/dialog/dialog.dart';
@@ -86,7 +88,7 @@ class SeasonInfoItem extends StatelessWidget {
             controller.onSelect(season);
             return;
           }
-          Get.to(
+          Get.toSafe(
             DownloadPagePage(
               seasonInfo: seasonInfo,
               progress: progress,
@@ -96,9 +98,11 @@ class SeasonInfoItem extends StatelessWidget {
         onLongPress: onLongPress,
         onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
         child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: Style.safeSpace,
-            vertical: 5,
+          padding: EdgeInsets.fromLTRB(
+            Style.safeSpace,
+            5,
+            railTrailingSpace(context, Style.safeSpace),
+            5,
           ),
           child: Row(
             spacing: 10,

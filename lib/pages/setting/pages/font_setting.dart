@@ -1,3 +1,5 @@
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -150,6 +152,7 @@ class _FontSettingPageState extends State<FontSettingPage> {
     }
     return SimpleScaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
         title: const Text('App字体设置'),
         actions: [
           TextButton(

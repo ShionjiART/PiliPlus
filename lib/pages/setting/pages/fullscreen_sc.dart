@@ -1,3 +1,6 @@
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+import 'package:PiliPlus/utils/ios/foldable_helper.dart';
+
 import 'dart:io' show Platform;
 import 'dart:math' as math;
 
@@ -38,6 +41,7 @@ class _FullScreenScState extends State<FullScreenSc> {
     if (Platform.isAndroid) {
       landscapeLeftMode();
     } else if (Platform.isIOS) {
+      IOSNativeTabBar.setFullScreen(true);
       landscapeRightMode();
     }
   }
@@ -45,7 +49,10 @@ class _FullScreenScState extends State<FullScreenSc> {
   @override
   void dispose() {
     if (PlatformUtils.isMobile) {
-      if (Pref.horizontalScreen) {
+      if (IOSFoldableHelper.isIPhone) {
+        IOSNativeTabBar.setFullScreen(false);
+        IOSFoldableHelper.applyOrientation();
+      } else if (Pref.horizontalScreen) {
         fullMode();
       } else {
         portraitUpMode();
@@ -102,6 +109,7 @@ class _FullScreenScState extends State<FullScreenSc> {
   Widget build(BuildContext context) {
     return SimpleScaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
         title: Row(
           children: [
             const Text('全屏 SuperChat 设置'),

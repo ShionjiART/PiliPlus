@@ -1,3 +1,4 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
 import 'package:PiliPlus/pages/fav/pgc/child_view.dart';
 import 'package:PiliPlus/pages/fav/pgc/controller.dart';
 import 'package:PiliPlus/utils/extension/scroll_controller_ext.dart';
@@ -52,7 +53,10 @@ class _FavPgcPageState extends State<FavPgcPage>
                 isScrollable: true,
                 tabAlignment: TabAlignment.start,
                 controller: _tabController,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
+                padding: railPageInsets(
+                  context,
+                  const EdgeInsets.symmetric(horizontal: 8),
+                ),
                 dividerHeight: 0,
                 indicatorWeight: 0,
                 indicatorPadding: const EdgeInsets.symmetric(
@@ -101,7 +105,7 @@ class _FavPgcPageState extends State<FavPgcPage>
           ],
         ),
         Expanded(
-          child: TabBarView(
+          child: RailTabBarView(
             controller: _tabController,
             physics: const NeverScrollableScrollPhysics(),
             children: List.generate(

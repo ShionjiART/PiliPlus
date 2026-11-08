@@ -1,6 +1,9 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
+
 import 'dart:io';
 
 import 'package:PiliPlus/common/style.dart';
+import 'package:PiliPlus/common/widgets/home_tools_slot.dart';
 import 'package:PiliPlus/common/widgets/floating_navigation_bar.dart';
 import 'package:PiliPlus/common/widgets/flutter/pop_scope.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
@@ -9,6 +12,8 @@ import 'package:PiliPlus/common/widgets/route_aware_mixin.dart';
 import 'package:PiliPlus/models/common/nav_bar_config.dart';
 import 'package:PiliPlus/pages/home/view.dart';
 import 'package:PiliPlus/pages/main/controller.dart';
+import 'package:PiliPlus/models/common/dynamic/dynamic_badge_mode.dart';
+import 'package:PiliPlus/utils/ios/native_page_actions.dart';
 import 'package:PiliPlus/utils/android/bindings.g.dart';
 import 'package:PiliPlus/utils/app_scheme.dart';
 import 'package:PiliPlus/utils/desktop/tray_controller.dart';
@@ -16,6 +21,8 @@ import 'package:PiliPlus/utils/desktop/window_controller.dart';
 import 'package:PiliPlus/utils/extension/context_ext.dart';
 import 'package:PiliPlus/utils/extension/size_ext.dart';
 import 'package:PiliPlus/utils/extension/theme_ext.dart';
+import 'package:PiliPlus/utils/ios/foldable_helper.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:PiliPlus/utils/mobile_observer.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
@@ -36,7 +43,11 @@ class _MainAppState extends PopScopeState<MainApp>
   final _mainController = Get.put(MainController());
   late EdgeInsets _padding;
   late ColorScheme _colorScheme;
+  // 切换状态栏导航与其他布局时保留页面状态
+  final _bodyKey = GlobalKey();
   Brightness? _brightness;
+  ModalRoute<dynamic>? _homeRoute;
+  bool _homeToolsScheduled = false;
 
   @override
   bool get initCanPop => false;
@@ -55,6 +66,124 @@ class _MainAppState extends PopScopeState<MainApp>
     if (!Platform.isMacOS) {
       PiliScheme.init();
     }
+    if (Platform.isIOS) {
+      IOSNativeTabBar.rightRailDevice.addListener(_onNativeHomeChanged);
+      IOSNativeTabBar.homeToolsAvailable.addListener(_onNativeHomeChanged);
+      _nativeTabBarWorkers.addAll([
+        ever(_mainController.selectedIndex, (_) => _onNativeHomeChanged()),
+        ever(
+          _mainController.accountService.isLogin,
+          (_) => _scheduleHomeTools(),
+        ),
+        ever(_mainController.msgUnReadCount, (_) => _scheduleHomeTools()),
+      ]);
+      _attachNativeTabBar();
+    }
+  }
+
+  final List<Worker> _nativeTabBarWorkers = [];
+
+  void _onNativeHomeChanged() {
+    if (!mounted) return;
+    setState(_updateNavMode);
+    _scheduleHomeTools();
+  }
+
+  void _scheduleHomeTools() {
+    if (_homeToolsScheduled) return;
+    _homeToolsScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _homeToolsScheduled = false;
+      if (!mounted || _homeRoute == null) {
+        return;
+      }
+      final isHome =
+          _mainController.navigationBars[_mainController.selectedIndex.value] ==
+          NavigationBarType.home;
+      if (!IOSNativeTabBar.rightRailDevice.value || !isHome) {
+        IOSNativeTabBar.removePageActions(_homeRoute!);
+        return;
+      }
+      final loggedIn = _mainController.accountService.isLogin.value;
+      final count = _mainController.msgUnReadCount.value;
+      final badgeMode = _mainController.msgBadgeMode;
+      IOSNativeTabBar.setPageActions(
+        route: _homeRoute!,
+        homeTools: true,
+        actions: [
+          const NativePageAction(id: 'search', title: '搜索'),
+          NativePageAction(
+            id: 'notifications',
+            title: '消息',
+            badge:
+                loggedIn &&
+                    badgeMode != DynamicBadgeMode.hidden &&
+                    count != null
+                ? (badgeMode == DynamicBadgeMode.number ? count : '')
+                : null,
+          ),
+        ],
+        onAction: (id) {
+          if (!mounted ||
+              !(_homeRoute?.isCurrent ?? false) ||
+              _mainController.navigationBars[_mainController
+                      .selectedIndex
+                      .value] !=
+                  NavigationBarType.home) {
+            return;
+          }
+          switch (id) {
+            case 'search':
+              Get.toNamed(
+                '/search',
+                parameters: _mainController.homeController.enableSearchWord
+                    ? {
+                        'hintText':
+                            _mainController.homeController.defaultSearch.value,
+                      }
+                    : null,
+              );
+            case 'notifications':
+              if (!_mainController.accountService.isLogin.value) {
+                Get.toNamed('/loginPage');
+                return;
+              }
+              _mainController
+                ..clearUnreadMsg()
+                ..lastCheckUnreadAt = DateTime.now().millisecondsSinceEpoch;
+              Get.toNamed('/whisper');
+          }
+        },
+      );
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
+  Future<void> _attachNativeTabBar() async {
+    final tabs = _mainController.navigationBars;
+    final attached = await IOSNativeTabBar.attach(
+      tabs: [for (final tab in tabs) (id: tab.name, title: tab.label)],
+      selected: _mainController.selectedIndex.value,
+      onSelect: _mainController.setIndex,
+    );
+    if (!attached || !mounted) return;
+    _nativeTabBarWorkers.addAll([
+      ever(_mainController.selectedIndex, IOSNativeTabBar.setSelected),
+      ever(_mainController.dynCount, (int count) {
+        final index = tabs.indexOf(.dynamics);
+        if (index == -1) return;
+        IOSNativeTabBar.setBadge(
+          index,
+          count > 0 && _mainController.dynamicBadgeMode != .hidden
+              ? (_mainController.dynamicBadgeMode == .number ? '$count' : '')
+              : null,
+        );
+      }),
+    ]);
+    setState(() {
+      _mainController.useNativeTabBar = true;
+      _updateNavMode();
+    });
   }
 
   @override
@@ -73,23 +202,50 @@ class _MainAppState extends PopScopeState<MainApp>
         );
       }
     }
-    if (!_mainController.useSideBar) {
+    _updateNavMode();
+    _homeRoute = ModalRoute.of(context);
+    _scheduleHomeTools();
+  }
+
+  void _updateNavMode() {
+    // iPhone Duo 的系统状态栏位于右侧竖条（安全区约 84pt），导航放入其中；
+    // 普通 iPhone 横屏时灵动岛一侧的安全区约 60pt，不会触发
+    _mainController.useStatusBarNav =
+        !_mainController.useNativeTabBar &&
+        !_mainController.useSideBar &&
+        IOSFoldableHelper.isIPhone &&
+        _mainController.navigationBars.length > 1 &&
+        _padding.right >= 72;
+    // 系统标签栏接管导航时，页面按手机布局显示顶部搜索栏
+    if (_mainController.useNativeTabBar ||
+        _mainController.useStatusBarNav ||
+        IOSNativeTabBar.rightRailDevice.value) {
+      _mainController.useBottomNav = true;
+    } else if (!_mainController.useSideBar) {
       _mainController.useBottomNav = MediaQuery.sizeOf(context).isPortrait;
     }
+    _mainController.homeToolsPlacement.value = resolveHomeToolsPlacement(
+      useBottomNav: _mainController.useBottomNav,
+      nativeToolsAvailable: IOSNativeTabBar.homeToolsAvailable.value,
+    );
   }
 
   @override
   void didPopNext() {
+    IOSNativeTabBar.setHidden(false);
     addObserverMobile(this);
     _mainController
       ..checkUnreadDynamic()
       ..checkDefaultSearch(true)
       ..checkUnread(_mainController.useBottomNav);
     super.didPopNext();
+    _scheduleHomeTools();
   }
 
   @override
   void didPushNext() {
+    // 进入二级页面时隐藏系统标签栏
+    IOSNativeTabBar.setHidden(true);
     removeObserverMobile(this);
     super.didPushNext();
   }
@@ -106,6 +262,11 @@ class _MainAppState extends PopScopeState<MainApp>
 
   @override
   void dispose() {
+    if (Platform.isIOS) {
+      IOSNativeTabBar.rightRailDevice.removeListener(_onNativeHomeChanged);
+      IOSNativeTabBar.homeToolsAvailable.removeListener(_onNativeHomeChanged);
+    }
+    if (_homeRoute case final route?) IOSNativeTabBar.removePageActions(route);
     if (Platform.isMacOS) {
       HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
     }
@@ -114,6 +275,9 @@ class _MainAppState extends PopScopeState<MainApp>
       TrayController.instance.dispose();
     }
     removeObserverMobile(this);
+    for (final worker in _nativeTabBarWorkers) {
+      worker.dispose();
+    }
     PiliScheme.listener?.cancel();
     GStorage.close();
     super.dispose();
@@ -236,6 +400,34 @@ class _MainAppState extends PopScopeState<MainApp>
     return bottomNav;
   }
 
+  Widget _statusBarNav() {
+    return MediaQuery.removePadding(
+      context: context,
+      removeLeft: true,
+      removeTop: true,
+      removeRight: true,
+      child: Obx(
+        () => NavigationRail(
+          minWidth: _padding.right,
+          groupAlignment: 0.0,
+          labelType: _mainController.hideSideBarLabel ? .none : .all,
+          backgroundColor: Colors.transparent,
+          onDestinationSelected: _mainController.setIndex,
+          selectedIndex: _mainController.selectedIndex.value,
+          destinations: _mainController.navigationBars
+              .map(
+                (e) => NavigationRailDestination(
+                  label: Text(e.label),
+                  icon: _buildIcon(type: e),
+                  selectedIcon: _buildIcon(type: e, selected: true),
+                ),
+              )
+              .toList(),
+        ),
+      ),
+    );
+  }
+
   Widget _sideBar() {
     if (_mainController.navigationBars.length > 1) {
       if (context.isTablet && _mainController.optTabletNav) {
@@ -320,25 +512,48 @@ class _MainAppState extends PopScopeState<MainApp>
   Widget build(BuildContext context) {
     Widget child;
     if (_mainController.mainTabBarView) {
-      child = TabBarView(
+      child = RailTabBarView(
         controller: _mainController.controller,
         physics: const NeverScrollableScrollPhysics(),
         scrollDirection: _mainController.useBottomNav ? .horizontal : .vertical,
         children: _mainController.navigationBars.map((i) => i.page).toList(),
       );
     } else {
-      child = PageView(
+      child = RailPageView(
         controller: _mainController.controller,
         physics: const NeverScrollableScrollPhysics(),
         children: _mainController.navigationBars.map((i) => i.page).toList(),
       );
     }
+    child = KeyedSubtree(key: _bodyKey, child: child);
 
     Widget? sideBar;
     Widget? bottomNav;
     final EdgeInsets padding;
-    if (_mainController.useBottomNav) {
-      bottomNav = _bottomNav;
+    if (_mainController.useStatusBarNav) {
+      child = Material(
+        child: Row(
+          children: [
+            Expanded(
+              child: MediaQuery.removePadding(
+                context: context,
+                removeRight: true,
+                child: Padding(
+                  padding: .only(top: _padding.top, left: _padding.left),
+                  child: child,
+                ),
+              ),
+            ),
+            _statusBarNav(),
+          ],
+        ),
+      );
+      return AnnotatedRegion<SystemUiOverlayStyle>(
+        value: _systemUiOverlayStyle,
+        child: child,
+      );
+    } else if (_mainController.useBottomNav) {
+      bottomNav = _mainController.useNativeTabBar ? null : _bottomNav;
       if (bottomNav != null) {
         bottomNav = MediaQuery.removePadding(
           context: context,
@@ -346,7 +561,20 @@ class _MainAppState extends PopScopeState<MainApp>
           child: bottomNav,
         );
       }
-      padding = _padding.copyWith(bottom: 0);
+      final isHome =
+          _mainController.navigationBars[_mainController.selectedIndex.value] ==
+          NavigationBarType.home;
+      padding = _padding.copyWith(
+        bottom: 0,
+        top: isHome
+            ? homeTopSpacing(
+                _padding.top,
+                _mainController.homeToolsPlacement.value,
+                alreadyNormalized:
+                    RailViewportScope.of(context)?.normalizedTop ?? false,
+              )
+            : _padding.top,
+      );
     } else {
       sideBar = DecoratedBox(
         decoration: BoxDecoration(
@@ -371,20 +599,22 @@ class _MainAppState extends PopScopeState<MainApp>
 
     if (PlatformUtils.isMobile) {
       return AnnotatedRegion<SystemUiOverlayStyle>(
-        value: SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          statusBarBrightness: _colorScheme.brightness,
-          statusBarIconBrightness: _colorScheme.brightness.reverse,
-          systemStatusBarContrastEnforced: false,
-          systemNavigationBarColor: Colors.transparent,
-          systemNavigationBarIconBrightness: _colorScheme.brightness.reverse,
-        ),
+        value: _systemUiOverlayStyle,
         child: child,
       );
     }
 
     return child;
   }
+
+  SystemUiOverlayStyle get _systemUiOverlayStyle => SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarBrightness: _colorScheme.brightness,
+    statusBarIconBrightness: _colorScheme.brightness.reverse,
+    systemStatusBarContrastEnforced: false,
+    systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarIconBrightness: _colorScheme.brightness.reverse,
+  );
 
   Widget _buildIcon({required NavigationBarType type, bool selected = false}) {
     final icon = selected ? type.selectIcon : type.icon;

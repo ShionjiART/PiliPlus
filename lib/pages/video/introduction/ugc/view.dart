@@ -1,3 +1,4 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
 import 'package:PiliPlus/common/assets.dart';
 import 'package:PiliPlus/common/constants.dart';
 import 'package:PiliPlus/common/style.dart';
@@ -96,9 +97,9 @@ class _UgcIntroPanelState extends State<UgcIntroPanel> {
     final isPortrait = widget.isPortrait;
     final isHorizontal = !isPortrait && widget.isHorizontal;
     return SliverPadding(
-      padding: const .only(
+      padding: EdgeInsets.only(
         left: Style.safeSpace,
-        right: Style.safeSpace,
+        right: railTrailingSpace(context, Style.safeSpace),
         top: 10,
       ),
       sliver: Obx(

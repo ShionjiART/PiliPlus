@@ -1,3 +1,4 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
 import 'package:PiliPlus/common/widgets/self_sized_horizontal_list.dart';
 import 'package:PiliPlus/common/widgets/sliver/sliver_pinned_header.dart';
 import 'package:PiliPlus/models/common/member/archive_order_type_web.dart';
@@ -56,7 +57,10 @@ class _MemberVideoWebState
         backgroundColor: colorScheme.surface,
         child: SelfSizedHorizontalList(
           itemCount: tags.length,
-          padding: const .fromLTRB(10, 0, 10, 8),
+          padding: railPageInsets(
+            context,
+            const EdgeInsets.fromLTRB(10, 0, 10, 8),
+          ),
           itemBuilder: (context, index) {
             final item = tags[index];
             final isCurr = controller.specialType != null

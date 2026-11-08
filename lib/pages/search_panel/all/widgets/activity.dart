@@ -1,3 +1,4 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
 import 'package:PiliPlus/common/widgets/badge.dart';
 import 'package:PiliPlus/common/widgets/image/image_save.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
@@ -27,7 +28,10 @@ class SearchActivityItem extends StatelessWidget {
             onLongPress: PlatformUtils.isMobile ? onLongPress : null,
             onSecondaryTap: PlatformUtils.isDesktop ? onLongPress : null,
             child: Padding(
-              padding: const .symmetric(horizontal: 12, vertical: 5),
+              padding: railPageInsets(
+                context,
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+              ),
               child: Row(
                 spacing: 10,
                 crossAxisAlignment: .start,

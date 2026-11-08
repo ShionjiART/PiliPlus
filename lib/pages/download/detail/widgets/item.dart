@@ -1,3 +1,6 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
+
 import 'dart:async';
 import 'dart:io';
 
@@ -144,7 +147,7 @@ class DetailItem extends StatelessWidget {
       child: InkWell(
         onTap: () async {
           if (!canDel) {
-            Get.to(const DownloadingPage());
+            Get.toSafe(const DownloadingPage());
             return;
           }
           if (enableMultiSelect) {
@@ -189,9 +192,11 @@ class DetailItem extends StatelessWidget {
         onLongPress: onLongPress,
         onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
         child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: Style.safeSpace,
-            vertical: 5,
+          padding: EdgeInsets.fromLTRB(
+            Style.safeSpace,
+            5,
+            railTrailingSpace(context, Style.safeSpace),
+            5,
           ),
           child: Row(
             spacing: 10,

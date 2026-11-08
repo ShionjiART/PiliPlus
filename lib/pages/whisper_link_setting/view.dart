@@ -1,3 +1,4 @@
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:PiliPlus/common/widgets/pendant_avatar.dart';
 import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
 import 'package:PiliPlus/http/loading_state.dart';
@@ -48,7 +49,10 @@ class _WhisperLinkSettingPageState extends State<WhisperLinkSettingPage> {
       color: theme.colorScheme.outline.withValues(alpha: 0.1),
     );
     return SimpleScaffold(
-      appBar: AppBar(title: const Text('聊天设置')),
+      appBar: AppBar(
+        automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
+        title: const Text('聊天设置'),
+      ),
       body: ListView(
         padding: EdgeInsets.only(
           bottom: MediaQuery.viewPaddingOf(context).bottom + 100,

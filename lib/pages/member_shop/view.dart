@@ -1,3 +1,4 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
 import 'package:PiliPlus/common/skeleton/space_opus.dart';
 import 'package:PiliPlus/common/sliver_single_child_delegate.dart';
 import 'package:PiliPlus/common/style.dart';
@@ -53,7 +54,7 @@ class _MemberShopState extends State<MemberShop>
             padding: EdgeInsets.only(
               top: 12,
               left: Style.safeSpace,
-              right: Style.safeSpace,
+              right: railTrailingSpace(context, Style.safeSpace),
               bottom: MediaQuery.viewPaddingOf(context).bottom + 100,
             ),
             sliver: Obx(() => _buildBody(_controller.loadingState.value)),

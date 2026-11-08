@@ -1,3 +1,4 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
 import 'package:PiliPlus/common/widgets/avatars.dart';
 import 'package:PiliPlus/common/widgets/image/image_save.dart';
 import 'package:PiliPlus/http/loading_state.dart';
@@ -84,7 +85,10 @@ class DynamicPanel extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+              padding: railPageInsets(
+                context,
+                const EdgeInsets.fromLTRB(12, 12, 12, 6),
+              ),
               child: authorWidget,
             ),
             if (item.modules.moduleDispute case final moduleDispute?)

@@ -1,3 +1,5 @@
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:PiliPlus/common/widgets/button/icon_button.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
@@ -46,10 +48,11 @@ class _LiveAreaDetailPageState extends State<LiveAreaDetailPage> {
     final padding = MediaQuery.viewPaddingOf(context);
     return SimpleScaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
         title: Text(widget.parentName),
         actions: [
           IconButton(
-            onPressed: () => Get.to(const LiveSearchPage()),
+            onPressed: () => Get.toSafe(const LiveSearchPage()),
             icon: const Icon(Icons.search),
           ),
           const SizedBox(width: 16),

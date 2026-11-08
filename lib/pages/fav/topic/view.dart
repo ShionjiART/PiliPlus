@@ -1,3 +1,4 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
 import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/dialog/dialog.dart';
 import 'package:PiliPlus/common/widgets/flutter/refresh_indicator.dart';
@@ -40,7 +41,7 @@ class _FavTopicPageState extends State<FavTopicPage>
           SliverPadding(
             padding: EdgeInsets.only(
               left: Style.safeSpace,
-              right: Style.safeSpace,
+              right: railTrailingSpace(context, Style.safeSpace),
               top: Style.safeSpace,
               bottom: MediaQuery.viewPaddingOf(context).bottom + 100,
             ),

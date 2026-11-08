@@ -1,3 +1,5 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/button/more_btn.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/loading_widget.dart';
@@ -253,7 +255,7 @@ class _MemberHomeState extends State<MemberHome>
                   _ctr.tabController?.animateTo(index);
                 } else {
                   if (param == 'coinArchive') {
-                    Get.to(
+                    Get.toSafe(
                       MemberCoinArcPage(
                         mid: _ctr.mid,
                         name: _ctr.username,
@@ -263,7 +265,7 @@ class _MemberHomeState extends State<MemberHome>
                   }
 
                   if (param == 'likeArchive') {
-                    Get.to(
+                    Get.toSafe(
                       MemberLikeArcPage(
                         mid: _ctr.mid,
                         name: _ctr.username,
@@ -296,7 +298,10 @@ class _MemberHomeState extends State<MemberHome>
     );
     yield SliverToBoxAdapter(
       child: Padding(
-        padding: const .symmetric(horizontal: Style.safeSpace),
+        padding: railPageInsets(
+          context,
+          const EdgeInsets.symmetric(horizontal: Style.safeSpace),
+        ),
         child: OpusGridBuilder(
           childCount: archives.length,
           gridDelegate: gridDelegateV,
@@ -347,7 +352,10 @@ class _MemberHomeState extends State<MemberHome>
     );
     yield SliverToBoxAdapter(
       child: Padding(
-        padding: const .symmetric(horizontal: Style.safeSpace),
+        padding: railPageInsets(
+          context,
+          const EdgeInsets.symmetric(horizontal: Style.safeSpace),
+        ),
         child: OpusGridBuilder(
           gridDelegate: gridDelegateV,
           childCount: coinArchives.length,
@@ -372,7 +380,10 @@ class _MemberHomeState extends State<MemberHome>
     );
     yield SliverToBoxAdapter(
       child: Padding(
-        padding: const .symmetric(horizontal: Style.safeSpace),
+        padding: railPageInsets(
+          context,
+          const EdgeInsets.symmetric(horizontal: Style.safeSpace),
+        ),
         child: OpusGridBuilder(
           gridDelegate: gridDelegateV,
           childCount: likeArchives.length,
@@ -457,7 +468,10 @@ class _MemberHomeState extends State<MemberHome>
     );
     yield SliverToBoxAdapter(
       child: Padding(
-        padding: const .symmetric(horizontal: Style.safeSpace),
+        padding: railPageInsets(
+          context,
+          const EdgeInsets.symmetric(horizontal: Style.safeSpace),
+        ),
         child: OpusGridBuilder(
           gridDelegate: gridDelegatePgc,
           childCount: seasons.length,

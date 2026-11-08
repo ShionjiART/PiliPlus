@@ -1,3 +1,5 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
+
 import 'dart:async';
 import 'dart:math';
 
@@ -234,7 +236,7 @@ class _EpisodePanelState extends State<EpisodePanel>
   @override
   Widget buildList() {
     if (_isMulti) {
-      return TabBarView(
+      return RailTabBarView(
         controller: _tabController,
         physics: tabBarScrollPhysics,
         horizontalDragGestureRecognizer: horizontalDragGestureRecognizer,
@@ -454,9 +456,11 @@ class _EpisodePanelState extends State<EpisodePanel>
             onLongPress: onLongPress,
             onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
             child: Padding(
-              padding: const .symmetric(
-                horizontal: Style.safeSpace,
-                vertical: 5,
+              padding: EdgeInsets.fromLTRB(
+                Style.safeSpace,
+                5,
+                railTrailingSpace(context, Style.safeSpace),
+                5,
               ),
               child: Row(
                 spacing: 10,

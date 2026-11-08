@@ -1,3 +1,4 @@
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 /*
  * This file is part of PiliPlus
  *
@@ -131,7 +132,9 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
       child: AppBar(
         clipBehavior: clipBehavior,
         leading: leading,
-        automaticallyImplyLeading: automaticallyImplyLeading,
+        automaticallyImplyLeading:
+            automaticallyImplyLeading &&
+            !IOSNativeTabBar.hasNativeBack(context),
         title: effectiveTitle,
         actions: actions,
         automaticallyImplyActions: automaticallyImplyActions,
@@ -310,7 +313,9 @@ class DynamicSliverAppBar extends StatelessWidget {
       onPerformLayout: onPerformLayout,
       delegate: _SliverAppBarDelegate(
         leading: leading,
-        automaticallyImplyLeading: automaticallyImplyLeading,
+        automaticallyImplyLeading:
+            automaticallyImplyLeading &&
+            !IOSNativeTabBar.hasNativeBack(context),
         title: title,
         actions: actions,
         automaticallyImplyActions: automaticallyImplyActions,

@@ -9,6 +9,9 @@ import 'package:PiliPlus/models/common/dynamic/dynamic_badge_mode.dart';
 import 'package:PiliPlus/models/common/dynamic/dynamics_type.dart';
 import 'package:PiliPlus/models/common/dynamic/up_panel_position.dart';
 import 'package:PiliPlus/models/common/follow_order_type.dart';
+import 'package:PiliPlus/models/common/horizontal_screen_mode.dart';
+import 'package:PiliPlus/models/common/inner_video_detail_layout.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:PiliPlus/models/common/member/tab_type.dart';
 import 'package:PiliPlus/models/common/mine_tab_type.dart';
 import 'package:PiliPlus/models/common/msg/msg_unread_type.dart';
@@ -35,6 +38,7 @@ import 'package:PiliPlus/plugin/pl_player/models/play_repeat.dart';
 import 'package:PiliPlus/utils/device_utils.dart';
 import 'package:PiliPlus/utils/extension/iterable_ext.dart';
 import 'package:PiliPlus/utils/global_data.dart';
+import 'package:PiliPlus/utils/ios/foldable_helper.dart';
 import 'package:PiliPlus/utils/login_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
@@ -199,7 +203,11 @@ abstract final class Pref {
   static FullScreenMode get fullScreenMode {
     int? index = _setting.get(SettingBoxKey.fullScreenMode);
     if (index == null) {
-      final FullScreenMode mode = horizontalScreen && DeviceUtils.isTablet
+      // 折叠屏 iPhone 首次启动可能在内屏，但合上后仍需横屏全屏
+      final FullScreenMode mode =
+          horizontalScreen &&
+              DeviceUtils.isTablet &&
+              !IOSFoldableHelper.isIPhone
           ? .none
           : .auto;
       _setting.put(SettingBoxKey.fullScreenMode, mode.index);
@@ -626,6 +634,13 @@ abstract final class Pref {
       _setting.get(SettingBoxKey.optTabletNav, defaultValue: true);
 
   static bool get horizontalScreen {
+    // 折叠屏 iPhone：展开时使用横屏适配，合上时恢复手机布局
+    if (IOSFoldableHelper.isAuto) return IOSFoldableHelper.isUnfolded;
+    return manualHorizontalScreen;
+  }
+
+  /// 【横屏适配】开关本身的值，不考虑折叠屏自动模式
+  static bool get manualHorizontalScreen {
     bool? horizontalScreen = _setting.get(SettingBoxKey.horizontalScreen);
     if (horizontalScreen == null) {
       final isTablet = DeviceUtils.isTablet;
@@ -634,6 +649,18 @@ abstract final class Pref {
     }
     return horizontalScreen;
   }
+
+  static HorizontalScreenMode get horizontalScreenMode =>
+      IOSFoldableHelper.isAuto
+      ? .auto
+      : manualHorizontalScreen
+      ? .on
+      : .off;
+
+  static InnerVideoDetailLayout get innerVideoDetailLayout =>
+      InnerVideoDetailLayout.fromStorage(
+        _setting.get(SettingBoxKey.innerVideoDetailLayout),
+      );
 
   static String get banWordForDyn =>
       _setting.get(SettingBoxKey.banWordForDyn, defaultValue: '');
@@ -713,6 +740,7 @@ abstract final class Pref {
       _setting.get(SettingBoxKey.enableSearchWord, defaultValue: false);
 
   static bool get useSideBar =>
+      !IOSNativeTabBar.rightRailDevice.value &&
       _setting.get(SettingBoxKey.useSideBar, defaultValue: false);
 
   static bool get hideSideBarLabel =>

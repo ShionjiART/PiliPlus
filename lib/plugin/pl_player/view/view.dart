@@ -1,4 +1,7 @@
 import 'dart:async';
+
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
@@ -890,7 +893,9 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
       .subtitle,
       .speed,
       if (isNotFileSource && flag) .qa,
-      if (!plPlayerController.isDesktopPip) .fullscreen,
+      if (!plPlayerController.isDesktopPip &&
+          (isFullScreen || !IOSNativeTabBar.usesNativeVideoNavigation(context)))
+        .fullscreen,
     ];
     return PlayerBar(
       left: Row(
@@ -1588,7 +1593,6 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
                   AppBarAni(
                     isTop: true,
                     controller: _animationController,
-                    isFullScreen: isFullScreen,
                     removeSafeArea: plPlayerController.removeSafeArea,
                     child: plPlayerController.isDesktopPip
                         ? GestureDetector(
@@ -1602,7 +1606,6 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
                   AppBarAni(
                     isTop: false,
                     controller: _animationController,
-                    isFullScreen: isFullScreen,
                     removeSafeArea: plPlayerController.removeSafeArea,
                     child:
                         widget.bottomControl ??

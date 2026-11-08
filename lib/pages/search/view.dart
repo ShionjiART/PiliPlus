@@ -1,3 +1,5 @@
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+
 import 'dart:convert';
 
 import 'package:PiliPlus/common/widgets/dialog/export_import.dart';
@@ -86,6 +88,8 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   PreferredSizeWidget get _buildAppBar => AppBar(
+    automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
+    titleSpacing: IOSNativeTabBar.hasNativeBack(context) ? 16 : null,
     shape: Border(
       bottom: BorderSide(
         color: theme.dividerColor.withValues(alpha: 0.08),

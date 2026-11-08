@@ -1,3 +1,4 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
 import 'package:PiliPlus/common/widgets/sliver/sliver_floating_header.dart';
 import 'package:PiliPlus/common/widgets/video_card/video_card_h.dart';
 import 'package:PiliPlus/models/common/search/video_search_type.dart';
@@ -58,7 +59,10 @@ mixin SearchVideoPanelMixin<S extends SearchVideoPanel>
     return SliverFloatingHeaderWidget(
       backgroundColor: colorScheme.surface,
       child: Padding(
-        padding: const .fromLTRB(12, 0, 12, 4),
+        padding: railPageInsets(
+          context,
+          const EdgeInsets.fromLTRB(12, 0, 12, 4),
+        ),
         child: Row(
           children: [
             Expanded(

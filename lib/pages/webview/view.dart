@@ -1,3 +1,5 @@
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+
 import 'dart:io' show Platform;
 
 import 'package:PiliPlus/common/widgets/route_aware_mixin.dart'
@@ -301,6 +303,9 @@ document.addEventListener('click', function(e) {
       appBar: widget.url != null
           ? null
           : AppBar(
+              automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(
+                context,
+              ),
               title: Obx(
                 () => Text(
                   _title.value.isNotEmpty ? _title.value : _currentUrl,
@@ -380,6 +385,9 @@ document.addEventListener('click', function(e) {
       appBar: widget.url != null
           ? null
           : AppBar(
+              automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(
+                context,
+              ),
               title: Obx(
                 () => Text(
                   _title.value.isNotEmpty ? _title.value : _currentUrl,

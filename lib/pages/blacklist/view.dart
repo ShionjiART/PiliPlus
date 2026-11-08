@@ -1,3 +1,5 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:PiliPlus/common/skeleton/msg_feed_top.dart';
 import 'package:PiliPlus/common/sliver_single_child_delegate.dart';
 import 'package:PiliPlus/common/widgets/dialog/dialog.dart';
@@ -70,7 +72,10 @@ class _BlackListPageState extends State<BlackListPage>
   @override
   Widget build(BuildContext context) {
     return SimpleScaffold(
-      appBar: AppBar(title: const Text('黑名单管理')),
+      appBar: AppBar(
+        automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
+        title: const Text('黑名单管理'),
+      ),
       body: Column(
         children: [
           TabBar(
@@ -196,7 +201,10 @@ class _BlackListPageState extends State<BlackListPage>
           ViewSliverSafeArea(
             bottom: 180,
             sliver: SliverPadding(
-              padding: const .fromLTRB(12, 12, 12, 0),
+              padding: railPageInsets(
+                context,
+                const EdgeInsets.fromLTRB(12, 12, 12, 0),
+              ),
               sliver: SliverFixedWrap(
                 spacing: 8,
                 runSpacing: 8,

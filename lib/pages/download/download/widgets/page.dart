@@ -1,3 +1,5 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/badge.dart';
 import 'package:PiliPlus/common/widgets/dialog/dialog.dart';
@@ -85,7 +87,7 @@ class PageInfoItem<T extends MultiSelectData> extends StatelessWidget {
             controller.onSelect(seasonInfo);
             return;
           }
-          Get.to(
+          Get.toSafe(
             DownloadDetailPage(
               pageId: pageInfo.pageId,
               title: pageInfo.title,
@@ -96,9 +98,11 @@ class PageInfoItem<T extends MultiSelectData> extends StatelessWidget {
         onLongPress: onLongPress,
         onSecondaryTap: PlatformUtils.isMobile ? null : onLongPress,
         child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: Style.safeSpace,
-            vertical: 5,
+          padding: EdgeInsets.fromLTRB(
+            Style.safeSpace,
+            5,
+            railTrailingSpace(context, Style.safeSpace),
+            5,
           ),
           child: Row(
             spacing: 10,

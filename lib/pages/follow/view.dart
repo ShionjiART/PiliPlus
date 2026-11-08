@@ -1,3 +1,5 @@
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:PiliPlus/common/widgets/dialog/dialog.dart';
 import 'package:PiliPlus/common/widgets/dialog/simple_dialog_option.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/loading_widget.dart';
@@ -89,6 +91,7 @@ class _FollowPageState extends State<FollowPage>
   }
 
   PreferredSizeWidget get _buildAppBar => AppBar(
+    automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
     title: _followController.isOwner
         ? const Text('我的关注')
         : Obx(() {
@@ -111,7 +114,7 @@ class _FollowPageState extends State<FollowPage>
                 if (_followController.followState.value is! Success) {
                   return;
                 }
-                Get.to(FollowTagSortPage(controller: _followController));
+                Get.toSafe(FollowTagSortPage(controller: _followController));
               },
               icon: const Icon(Icons.sort),
               tooltip: '分组排序',

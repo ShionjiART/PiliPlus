@@ -1,3 +1,4 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
 import 'package:PiliPlus/common/skeleton/skeleton.dart';
 import 'package:PiliPlus/common/style.dart';
 import 'package:material_ui/material_ui.dart';
@@ -15,7 +16,12 @@ class _MediaPgcSkeletonState extends State<MediaPgcSkeleton> {
     final bgColor = ColorScheme.of(context).onInverseSurface;
     return Skeleton(
       child: Padding(
-        padding: const .symmetric(horizontal: Style.safeSpace, vertical: 5),
+        padding: EdgeInsets.fromLTRB(
+          Style.safeSpace,
+          5,
+          railTrailingSpace(context, Style.safeSpace),
+          5,
+        ),
         child: Row(
           children: [
             Container(

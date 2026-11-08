@@ -1,3 +1,5 @@
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+
 import 'dart:async';
 import 'dart:io';
 
@@ -89,7 +91,14 @@ class _AboutPageState extends State<AboutPage> {
     final showAppBar = widget.showAppBar;
     final padding = MediaQuery.viewPaddingOf(context);
     return SimpleScaffold(
-      appBar: showAppBar ? AppBar(title: const Text('关于')) : null,
+      appBar: showAppBar
+          ? AppBar(
+              automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(
+                context,
+              ),
+              title: const Text('关于'),
+            )
+          : null,
       body: ListView(
         padding: EdgeInsets.only(
           left: showAppBar ? padding.left : 0,

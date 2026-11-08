@@ -1,3 +1,4 @@
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:PiliPlus/pages/follow_type/follow_same/controller.dart';
 import 'package:PiliPlus/pages/follow_type/view.dart';
 import 'package:PiliPlus/utils/extension/get_ext.dart';
@@ -33,6 +34,7 @@ class _FollowSamePageState extends FollowTypePageState<FollowSamePage> {
 
   @override
   PreferredSizeWidget get appBar => AppBar(
+    automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
     title: Obx(
       () {
         final name = controller.name.value;

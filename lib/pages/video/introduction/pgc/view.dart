@@ -1,3 +1,5 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
+
 import 'dart:math';
 
 import 'package:PiliPlus/common/style.dart';
@@ -129,10 +131,10 @@ class _PgcIntroPageState extends State<PgcIntroPage> {
       }
     }
     return SliverPadding(
-      padding: const .fromLTRB(
+      padding: EdgeInsets.fromLTRB(
         Style.safeSpace,
         Style.safeSpace,
-        Style.safeSpace,
+        railTrailingSpace(context, Style.safeSpace),
         Style.safeSpace + 50,
       ),
       sliver: sliver,

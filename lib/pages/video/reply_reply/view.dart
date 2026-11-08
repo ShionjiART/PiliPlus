@@ -1,3 +1,6 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:PiliPlus/common/skeleton/video_reply.dart';
 import 'package:PiliPlus/common/sliver_single_child_delegate.dart';
 import 'package:PiliPlus/common/style.dart';
@@ -57,7 +60,7 @@ class VideoReplyReplyPanel extends CommonSlidePage {
     required int type,
     Uri? uri,
   }) {
-    return Get.to(
+    return Get.toSafe(
       arguments: {
         'oid': oid,
         'rpid': rootId,
@@ -65,30 +68,33 @@ class VideoReplyReplyPanel extends CommonSlidePage {
         'type': type,
         'enterUri': ?uri?.toString(), // save panel
       },
-      () => SimpleScaffold(
-        appBar: AppBar(
-          title: const Text('评论详情'),
-          actions: [
-            IconButton(
-              tooltip: '前往',
-              onPressed: uri == null
-                  ? null
-                  : () => PiliScheme.routePush(uri, businessId: type),
-              icon: const Icon(Icons.open_in_browser),
-            ),
-          ],
-        ),
-        body: ViewSafeArea(
-          child: VideoReplyReplyPanel(
-            enableSlide: false,
-            oid: oid,
-            rpid: rootId,
-            isVideoDetail: false,
-            replyType: type,
-            firstFloor: null,
-            id: rpId,
+      () => Builder(
+        builder: (context) => SimpleScaffold(
+          appBar: AppBar(
+            automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
+            title: const Text('评论详情'),
+            actions: [
+              IconButton(
+                tooltip: '前往',
+                onPressed: uri == null
+                    ? null
+                    : () => PiliScheme.routePush(uri, businessId: type),
+                icon: const Icon(Icons.open_in_browser),
+              ),
+            ],
           ),
-        ).constraintWidth(),
+          body: ViewSafeArea(
+            child: VideoReplyReplyPanel(
+              enableSlide: false,
+              oid: oid,
+              rpid: rootId,
+              isVideoDetail: false,
+              replyType: type,
+              firstFloor: null,
+              id: rpId,
+            ),
+          ).constraintWidth(),
+        ),
       ),
     );
   }
@@ -158,7 +164,10 @@ class _VideoReplyReplyPanelState extends State<VideoReplyReplyPanel>
                         ),
                       ),
                     ),
-                    padding: const EdgeInsets.only(left: 12, right: 2),
+                    padding: railPageInsets(
+                      context,
+                      const EdgeInsets.only(left: 12, right: 2),
+                    ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: <Widget>[

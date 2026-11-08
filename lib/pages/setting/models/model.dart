@@ -6,6 +6,7 @@ import 'package:PiliPlus/pages/setting/widgets/select_dialog.dart';
 import 'package:PiliPlus/pages/setting/widgets/switch_item.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:flutter/services.dart' show FilteringTextInputFormatter;
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart' hide PopupMenuItemSelected;
@@ -164,6 +165,8 @@ class SwitchModel extends SettingsModel {
   final ValueChanged<bool>? onChanged;
   final bool needReboot;
   final void Function(BuildContext context)? onTap;
+  final ValueListenable<bool>? disabledWhen;
+  final String? disabledSubtitle;
 
   const SwitchModel({
     super.subtitle,
@@ -176,6 +179,8 @@ class SwitchModel extends SettingsModel {
     this.onChanged,
     this.needReboot = false,
     this.onTap,
+    this.disabledWhen,
+    this.disabledSubtitle,
   });
 
   const SwitchModel.split({
@@ -184,17 +189,28 @@ class SwitchModel extends SettingsModel {
     this.needReboot = false,
     this.onChanged,
     this.onTap,
+    this.disabledWhen,
+    this.disabledSubtitle,
   }) : title = null;
 
   @override
   String get effectiveTitle => title!;
   @override
-  String? get effectiveSubtitle => subtitle;
+  String? get effectiveSubtitle =>
+      disabledWhen?.value == true ? disabledSubtitle ?? subtitle : subtitle;
 
   @override
-  Widget get widget => SetSwitchItem(
+  Widget get widget => disabledWhen == null
+      ? _buildSwitch(false)
+      : ValueListenableBuilder<bool>(
+          valueListenable: disabledWhen!,
+          builder: (_, disabled, _) => _buildSwitch(disabled),
+        );
+
+  Widget _buildSwitch(bool disabled) => SetSwitchItem(
     title: title!,
-    subtitle: subtitle,
+    subtitle: disabled ? disabledSubtitle ?? subtitle : subtitle,
+    enabled: !disabled,
     setKey: setKey,
     defaultVal: defaultVal,
     onChanged: onChanged,

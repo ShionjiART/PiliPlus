@@ -1,3 +1,5 @@
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
 import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
 import 'package:PiliPlus/common/widgets/scroll_physics.dart';
@@ -80,19 +82,25 @@ class _SeasonSeriesPageState extends State<SeasonSeriesPage>
                       dynamic id = isSeason
                           ? item.meta!.seasonId
                           : item.meta!.seriesId;
-                      Get.to(
-                        SimpleScaffold(
-                          appBar: AppBar(title: Text(item.meta!.name!)),
-                          body: ViewSafeArea(
-                            child: MemberVideo(
-                              type: isSeason
-                                  ? ContributeType.season
-                                  : ContributeType.series,
-                              heroTag: widget.heroTag,
-                              mid: widget.mid,
-                              seasonId: isSeason ? id : null,
-                              seriesId: isSeason ? null : id,
-                              title: item.meta!.name,
+                      Get.toSafe(
+                        () => Builder(
+                          builder: (context) => SimpleScaffold(
+                            appBar: AppBar(
+                              automaticallyImplyLeading:
+                                  !IOSNativeTabBar.hasNativeBack(context),
+                              title: Text(item.meta!.name!),
+                            ),
+                            body: ViewSafeArea(
+                              child: MemberVideo(
+                                type: isSeason
+                                    ? ContributeType.season
+                                    : ContributeType.series,
+                                heroTag: widget.heroTag,
+                                mid: widget.mid,
+                                seasonId: isSeason ? id : null,
+                                seriesId: isSeason ? null : id,
+                                title: item.meta!.name,
+                              ),
                             ),
                           ),
                         ),

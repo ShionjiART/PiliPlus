@@ -1,3 +1,4 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
 import 'package:PiliPlus/common/widgets/hit_test.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/loading_widget.dart';
 import 'package:PiliPlus/models/common/member/contribute_type.dart';
@@ -62,7 +63,10 @@ class _MemberContributeState extends State<MemberContribute>
                     Colors.transparent,
                   ),
                   splashFactory: NoSplash.splashFactory,
-                  padding: const .symmetric(horizontal: 8),
+                  padding: railPageInsets(
+                    context,
+                    const EdgeInsets.symmetric(horizontal: 8),
+                  ),
                   isScrollable: true,
                   tabs: _controller.tabs!,
                   tabAlignment: .start,
@@ -88,7 +92,7 @@ class _MemberContributeState extends State<MemberContribute>
                 ),
               ),
               Expanded(
-                child: TabBarView(
+                child: RailTabBarView(
                   physics: const NeverScrollableScrollPhysics(),
                   controller: _controller.tabController,
                   children: _controller.items!.map(_getPageFromType).toList(),

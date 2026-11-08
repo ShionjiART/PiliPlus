@@ -1,3 +1,6 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+
 import 'dart:io';
 import 'dart:math';
 import 'dart:ui';
@@ -11,6 +14,7 @@ import 'package:PiliPlus/common/widgets/flutter/pop_scope.dart';
 import 'package:PiliPlus/common/widgets/gesture/horizontal_drag_gesture_recognizer.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/keep_alive_wrapper.dart';
+import 'package:PiliPlus/common/widgets/view_safe_area.dart';
 import 'package:PiliPlus/common/widgets/route_aware_mixin.dart';
 import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
 import 'package:PiliPlus/common/widgets/scroll_physics.dart'
@@ -107,7 +111,11 @@ class _LiveRoomPageState extends State<LiveRoomPage>
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (plPlayerController.removeSafeArea) {
-      padding = .zero;
+      padding = EdgeInsets.only(
+        right: IOSNativeTabBar.rightRailDevice.value
+            ? MediaQuery.viewPaddingOf(context).right
+            : 0,
+      );
     } else {
       padding = MediaQuery.viewPaddingOf(context);
     }
@@ -497,7 +505,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
           child: SizedBox(
             width: maxWidth,
             height: max(0, bottomHeight),
-            child: _buildBottomWidget,
+            child: SideSafeArea(child: _buildBottomWidget),
           ),
         ),
       ],
@@ -529,7 +537,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
           height: maxHeight * 0.32,
           child: Offstage(
             offstage: isFullScreen,
-            child: _buildChatWidget(true),
+            child: SideSafeArea(child: _buildChatWidget(true)),
           ),
         ),
         Positioned(
@@ -539,7 +547,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
           height: bottomHeight,
           child: Offstage(
             offstage: isFullScreen,
-            child: _buildInputWidget,
+            child: SideSafeArea(child: _buildInputWidget),
           ),
         ),
       ],
@@ -583,6 +591,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
 
   PreferredSizeWidget _buildAppBar(bool isFullScreen) {
     return AppBar(
+      automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
       primary: !plPlayerController.removeSafeArea,
       toolbarHeight: isFullScreen ? 0 : null,
       backgroundColor: Colors.transparent,
@@ -748,28 +757,35 @@ class _LiveRoomPageState extends State<LiveRoomPage>
       padding: isFullScreen
           ? EdgeInsets.zero
           : EdgeInsets.only(left: padding.left, right: padding.right),
-      child: Row(
-        children: [
-          Container(
-            width: width,
-            height: height,
-            margin: EdgeInsets.only(bottom: padding.bottom),
-            child: videoPlayerPanel(
-              isFullScreen,
-              fill: Colors.transparent,
+      // The padding above takes the side insets, so the player controls must
+      // not add them again.
+      child: MediaQuery.removePadding(
+        context: context,
+        removeLeft: !isFullScreen,
+        removeRight: !isFullScreen,
+        child: Row(
+          children: [
+            Container(
               width: width,
               height: height,
+              margin: EdgeInsets.only(bottom: padding.bottom),
+              child: videoPlayerPanel(
+                isFullScreen,
+                fill: Colors.transparent,
+                width: width,
+                height: height,
+              ),
             ),
-          ),
-          Offstage(
-            offstage: isFullScreen,
-            child: SizedBox(
-              width: rightWidth,
-              height: videoHeight,
-              child: _buildBottomWidget,
+            Offstage(
+              offstage: isFullScreen,
+              child: SizedBox(
+                width: rightWidth,
+                height: videoHeight,
+                child: _buildBottomWidget,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -791,7 +807,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
     return Padding(
       padding: .only(bottom: 12, top: isPortrait ? 12 : 0),
       child: _liveRoomController.showSuperChat
-          ? PageView(
+          ? RailPageView(
               key: pageKey,
               controller: _liveRoomController.pageController,
               physics: tabBarScrollPhysics,

@@ -42,6 +42,8 @@ import 'package:PiliPlus/utils/extension/native_geometry_ext.dart';
 import 'package:PiliPlus/utils/extension/num_ext.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
 import 'package:PiliPlus/utils/image_utils.dart';
+import 'package:PiliPlus/utils/ios/foldable_helper.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:PiliPlus/utils/ios/pip_helper.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/path_utils.dart';
@@ -450,7 +452,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     seconds: fastForBackwardInSeconds,
   );
 
-  late final horizontalSeasonPanel = Pref.horizontalSeasonPanel;
+  bool get horizontalSeasonPanel => Pref.horizontalSeasonPanel;
   late final preInitPlayer = Pref.preInitPlayer;
   late final showRelatedVideo = Pref.showRelatedVideo;
   late final showVideoReply = Pref.showVideoReply;
@@ -613,10 +615,15 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
 
   void _onOrientationChanged(OrientationParams param) {
     _orientation = param.orientation;
+    if (_playerCount == 0) return;
     if (Platform.isIOS && !visible) return;
     if (controlsLock.value) return;
     final orientation = param.orientation;
     final isFullScreen = this.isFullScreen.value;
+    if (_fsProcessing) return;
+    if (IOSFoldableHelper.usesSystemOrientation &&
+        (!isFullScreen || IOSNativeTabBar.managedFullscreenDirection))
+      return;
     if (checkIsAutoRotate &&
         param.isAutoRotate != true &&
         (!isFullScreen ||
@@ -1480,6 +1487,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   }
 
   void _setFullScreen(bool val) {
+    IOSNativeTabBar.setFullScreen(val);
     isFullScreen.value = val;
     updateSubtitleStyle();
   }
@@ -1487,35 +1495,43 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   double screenRatio = 0.0;
   bool isManualFS = true;
   late final FullScreenMode mode = Pref.fullScreenMode;
-  late final horizontalScreen = Pref.horizontalScreen;
+  // 折叠屏展开/合上时会变化，不能缓存
+  bool get horizontalScreen => Pref.horizontalScreen;
   late final removeSafeArea = Pref.removeSafeArea;
 
-  Future<void>? changeOrientation({
+  Future<void> changeOrientation({
     required bool isVertical,
     DeviceOrientation? orientation,
-  }) {
+  }) async {
+    if (Platform.isIOS &&
+        IOSFoldableHelper.isAuto &&
+        mode == .auto &&
+        orientation == null &&
+        await IOSNativeTabBar.beginPlayerOrientation(vertical: isVertical)) {
+      return;
+    }
     if (orientation == null && (mode == .none || mode == .gravity)) {
-      return null;
+      return;
     }
     if (orientation == null &&
         (mode == .vertical ||
             (mode == .auto && isVertical) ||
             (mode == .ratio && (isVertical || screenRatio < kScreenRatio)))) {
-      return portraitUpMode();
+      await portraitUpMode();
     } else {
       // https://github.com/flutter/flutter/issues/73651
       // https://github.com/flutter/flutter/issues/183708
       if (Platform.isAndroid) {
         if ((orientation ?? _orientation) == .landscapeRight) {
-          return landscapeRightMode();
+          await landscapeRightMode();
         } else {
-          return landscapeLeftMode();
+          await landscapeLeftMode();
         }
       } else {
         if (orientation == .landscapeLeft) {
-          return landscapeLeftMode();
+          await landscapeLeftMode();
         } else {
-          return landscapeRightMode();
+          await landscapeRightMode();
         }
       }
     }
@@ -1538,6 +1554,9 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     try {
       if (status) {
         if (PlatformUtils.isMobile) {
+          // Native must release the normal scene policy before SystemChrome's
+          // explicit fullscreen direction reaches Flutter's platform plugin.
+          IOSNativeTabBar.setFullScreen(true);
           hideSystemBar();
           await changeOrientation(
             isVertical: isVertical,
@@ -1551,9 +1570,14 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
           if (!removeSafeArea) {
             showSystemBar();
           }
-          if (orientation == null && mode == .none) {
+          final foldChanged = IOSFoldableHelper.consumePendingOrientation();
+          if (orientation == null &&
+              mode == .none &&
+              !foldChanged &&
+              !IOSFoldableHelper.usesSystemOrientation) {
             return;
           }
+          _setFullScreen(false);
           await resetScreenRotation();
         } else {
           exitDesktopFullScreen();
@@ -1656,6 +1680,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   bool get isCloseAll => _isCloseAll;
 
   Future<void>? resetScreenRotation() {
+    if (IOSFoldableHelper.isIPhone) return IOSFoldableHelper.applyOrientation();
     if (horizontalScreen) {
       return fullMode();
     } else {
@@ -1672,16 +1697,18 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
 
   void dispose() {
     // 每次减1，最后销毁
-    resetScreenRotation();
     cancelLongPressTimer();
     _cancelSubForSeek();
     if (!_isCloseAll && _playerCount > 1) {
+      resetScreenRotation();
       _playerCount -= 1;
       _heartDuration = 0;
       return;
     }
 
     _playerCount = 0;
+    IOSNativeTabBar.setFullScreen(false);
+    resetScreenRotation();
     if (removeSafeArea) {
       showSystemBar();
     }

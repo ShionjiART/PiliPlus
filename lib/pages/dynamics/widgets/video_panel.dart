@@ -1,3 +1,4 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
 // 视频or合集
 import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/badge.dart';
@@ -35,7 +36,10 @@ Widget videoSeasonWidget(
 
   EdgeInsets padding;
   if (floor == 1) {
-    padding = const EdgeInsets.symmetric(horizontal: 12);
+    padding = railPageInsets(
+      context,
+      const EdgeInsets.symmetric(horizontal: 12),
+    );
   } else {
     padding = EdgeInsets.zero;
   }

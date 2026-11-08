@@ -1,3 +1,6 @@
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
+
 import 'dart:async';
 import 'dart:io' show File;
 
@@ -61,6 +64,7 @@ class _WhisperDetailPageState
     );
     return SimpleScaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
         title: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () {
@@ -107,7 +111,7 @@ class _WhisperDetailPageState
         actions: [
           IconButton(
             tooltip: '设置',
-            onPressed: () => Get.to(
+            onPressed: () => Get.toSafe(
               WhisperLinkSettingPage(
                 talkerUid: _whisperDetailController.talkerId,
               ),

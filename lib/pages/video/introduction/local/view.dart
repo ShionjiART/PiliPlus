@@ -1,3 +1,5 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
+
 import 'dart:io';
 
 import 'package:PiliPlus/common/style.dart';
@@ -68,9 +70,11 @@ class _LocalIntroPanelState extends State<LocalIntroPanel>
               _controller.playIndex(index, entry: entry);
             },
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: Style.safeSpace,
-                vertical: 5,
+              padding: EdgeInsets.fromLTRB(
+                Style.safeSpace,
+                5,
+                railTrailingSpace(context, Style.safeSpace),
+                5,
               ),
               child: Row(
                 spacing: 10,

@@ -1,3 +1,5 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:PiliPlus/common/skeleton/video_card_v.dart';
 import 'package:PiliPlus/common/sliver_single_child_delegate.dart';
 import 'package:PiliPlus/common/style.dart';
@@ -46,6 +48,7 @@ class _MemberLikeArcPageState extends State<MemberLikeArcPage> {
     final padding = MediaQuery.viewPaddingOf(context);
     return SimpleScaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
         title: Text(
           '${widget.mid == mid ? '我' : '${widget.name}'}的推荐',
         ),
@@ -59,7 +62,8 @@ class _MemberLikeArcPageState extends State<MemberLikeArcPage> {
               padding: EdgeInsets.only(
                 top: 7,
                 left: Style.safeSpace + padding.left,
-                right: Style.safeSpace + padding.right,
+                right:
+                    railTrailingSpace(context, Style.safeSpace) + padding.right,
                 bottom: padding.bottom + 100,
               ),
               sliver: Obx(() => _buildBody(_ctr.loadingState.value)),

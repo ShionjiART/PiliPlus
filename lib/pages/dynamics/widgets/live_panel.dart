@@ -1,3 +1,4 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/models/dynamics/result.dart';
 import 'package:material_ui/material_ui.dart';
@@ -16,7 +17,7 @@ Widget livePanel(
   }
   return Padding(
     padding: floor == 1
-        ? const EdgeInsets.symmetric(horizontal: 12)
+        ? railPageInsets(context, const EdgeInsets.symmetric(horizontal: 12))
         : EdgeInsets.zero,
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,

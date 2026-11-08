@@ -1,3 +1,4 @@
+import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
 
 class ViewSafeArea extends StatelessWidget {
@@ -26,4 +27,46 @@ class ViewSafeArea extends StatelessWidget {
       child: child,
     );
   }
+}
+
+/// Keeps a whole page clear of the left and right insets, such as iPhone Duo's
+/// vertical status bar, and removes them from [MediaQuery] so widgets inside
+/// do not add them again.
+class SideSafeArea extends StatelessWidget {
+  const SideSafeArea({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final padding = MediaQuery.paddingOf(context);
+    if (padding.left == 0 && padding.right == 0) return child;
+    final content = SafeArea(top: false, bottom: false, child: child);
+    final route = ModalRoute.of(context);
+    final animations = <Listenable>[
+      ?route?.animation,
+      ?route?.secondaryAnimation,
+    ];
+    return AnimatedBuilder(
+      animation: Listenable.merge(animations),
+      child: content,
+      builder: (context, child) {
+        final moving =
+            (route?.animation?.value ?? 1) < 1 ||
+            (route?.secondaryAnimation?.value ?? 0) > 0;
+        return ColoredBox(
+          color: moving
+              ? Colors.transparent
+              : Theme.of(context).scaffoldBackgroundColor,
+          child: child,
+        );
+      },
+    );
+  }
+}
+
+/// Also usable by Navigator.push(GetPageRoute(...)).
+class SideSafeRouteMiddleware extends GetMiddleware {
+  @override
+  Widget onPageBuilt(Widget page) => SideSafeArea(child: page);
 }

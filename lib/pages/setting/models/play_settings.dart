@@ -1,3 +1,5 @@
+import 'package:PiliPlus/utils/extension/get_ext.dart';
+
 import 'dart:io' show Platform;
 
 import 'package:PiliPlus/common/widgets/custom_icon.dart';
@@ -177,12 +179,14 @@ List<SettingsModel> get playSettings => [
   ),
   SwitchModel(
     title: '横屏分P/合集列表显示在Tab栏',
+    subtitle: '未手动设置时跟随【横屏适配】',
     leading: const Icon(Icons.format_list_numbered_rtl_sharp),
     setKey: SettingBoxKey.horizontalSeasonPanel,
     defaultVal: Pref.horizontalScreen,
   ),
   SwitchModel(
     title: '横屏播放页在侧栏打开UP主页',
+    subtitle: '未手动设置时跟随【横屏适配】',
     leading: const Icon(Icons.account_circle_outlined),
     setKey: SettingBoxKey.horizontalMemberPage,
     defaultVal: Pref.horizontalScreen,
@@ -289,7 +293,7 @@ List<SettingsModel> get playSettings => [
     title: '全屏 SuperChat 设置',
     subtitle: '全屏 SuperChat (醒目留言) 大小、不透明度、缩放设置',
     leading: const Icon(Icons.open_in_full),
-    onTap: (_, _) => Get.to(const FullScreenSc()),
+    onTap: (_, _) => Get.toSafe(const FullScreenSc()),
   ),
   const SwitchModel(
     title: '竖屏扩大展示',

@@ -1,3 +1,4 @@
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:PiliPlus/common/widgets/flutter/list_tile.dart';
 import 'package:PiliPlus/common/widgets/flutter/refresh_indicator.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
@@ -24,7 +25,10 @@ class LoginDevicesPageState extends State<LoginDevicesPage> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return SimpleScaffold(
-      appBar: AppBar(title: const Text('登录设备')),
+      appBar: AppBar(
+        automaticallyImplyLeading: !IOSNativeTabBar.hasNativeBack(context),
+        title: const Text('登录设备'),
+      ),
       body: refreshIndicator(
         onRefresh: _controller.onRefresh,
         child: CustomScrollView(

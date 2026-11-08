@@ -1,3 +1,7 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
+
 import 'dart:math';
 
 import 'package:PiliPlus/common/style.dart';
@@ -155,7 +159,7 @@ class _PgcPageState extends State<PgcPage> with AutomaticKeepAliveClientMixin {
                         ],
                       ),
                       Expanded(
-                        child: TabBarView(
+                        child: RailTabBarView(
                           physics: const NeverScrollableScrollPhysics(),
                           children: response.map((item) {
                             final episodes = item.episodes;
@@ -208,9 +212,9 @@ class _PgcPageState extends State<PgcPage> with AutomaticKeepAliveClientMixin {
   List<Widget> _buildRcmd(ThemeData theme) => [
     _buildRcmdTitle(theme),
     SliverPadding(
-      padding: const EdgeInsets.only(
+      padding: EdgeInsets.only(
         left: Style.safeSpace,
-        right: Style.safeSpace,
+        right: railTrailingSpace(context, Style.safeSpace),
         bottom: 100,
       ),
       sliver: Obx(
@@ -238,7 +242,7 @@ class _PgcPageState extends State<PgcPage> with AutomaticKeepAliveClientMixin {
             padding: const EdgeInsets.symmetric(vertical: 2),
             onTap: () {
               if (widget.tabType == HomeTabType.bangumi) {
-                Get.to(const PgcIndexPage());
+                Get.toSafe(const PgcIndexPage());
               } else {
                 List<String> titles = const [
                   '全部',
@@ -248,45 +252,52 @@ class _PgcPageState extends State<PgcPage> with AutomaticKeepAliveClientMixin {
                   '综艺',
                 ];
                 List<int> types = const [102, 2, 5, 3, 7];
-                Get.to(
-                  SimpleScaffold(
-                    appBar: AppBar(title: const Text('索引')),
-                    body: DefaultTabController(
-                      length: types.length,
-                      child: Builder(
-                        builder: (context) {
-                          return Column(
-                            children: [
-                              ViewSafeArea(
-                                child: TabBar(
-                                  tabs: titles
-                                      .map((title) => Tab(text: title))
-                                      .toList(),
-                                  onTap: (index) {
-                                    try {
-                                      if (!DefaultTabController.of(
-                                        context,
-                                      ).indexIsChanging) {
-                                        Get.find<PgcIndexController>(
-                                          tag: types[index].toString(),
-                                        ).animateToTop();
-                                      }
-                                    } catch (_) {}
-                                  },
+                Get.toSafe(
+                  () => Builder(
+                    builder: (context) => SimpleScaffold(
+                      appBar: AppBar(
+                        automaticallyImplyLeading:
+                            !IOSNativeTabBar.hasNativeBack(context),
+                        title: const Text('索引'),
+                      ),
+                      body: DefaultTabController(
+                        length: types.length,
+                        child: Builder(
+                          builder: (context) {
+                            return Column(
+                              children: [
+                                ViewSafeArea(
+                                  child: TabBar(
+                                    tabs: titles
+                                        .map((title) => Tab(text: title))
+                                        .toList(),
+                                    onTap: (index) {
+                                      try {
+                                        if (!DefaultTabController.of(
+                                          context,
+                                        ).indexIsChanging) {
+                                          Get.find<PgcIndexController>(
+                                            tag: types[index].toString(),
+                                          ).animateToTop();
+                                        }
+                                      } catch (_) {}
+                                    },
+                                  ),
                                 ),
-                              ),
-                              Expanded(
-                                child: tabBarView(
-                                  children: types
-                                      .map(
-                                        (type) => PgcIndexPage(indexType: type),
-                                      )
-                                      .toList(),
+                                Expanded(
+                                  child: tabBarView(
+                                    children: types
+                                        .map(
+                                          (type) =>
+                                              PgcIndexPage(indexType: type),
+                                        )
+                                        .toList(),
+                                  ),
                                 ),
-                              ),
-                            ],
-                          );
-                        },
+                              ],
+                            );
+                          },
+                        ),
                       ),
                     ),
                   ),

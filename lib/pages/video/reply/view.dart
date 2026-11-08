@@ -1,3 +1,4 @@
+import 'package:PiliPlus/common/widgets/native_comment_button.dart';
 import 'package:PiliPlus/common/skeleton/video_reply.dart';
 import 'package:PiliPlus/common/sliver_single_child_delegate.dart';
 import 'package:PiliPlus/common/style.dart';
@@ -116,26 +117,28 @@ class _VideoReplyPanelState extends State<VideoReplyPanel>
               Obx(() => _buildBody(controller.loadingState.value)),
             ],
           ),
-          fab: SlideTransition(
+          fab: CommentFabTransition(
             position: fabAnimation,
             child: Padding(
               padding: .only(
                 right: kFloatingActionButtonMargin,
                 bottom: kFloatingActionButtonMargin + padding.bottom,
               ),
-              child: FloatingActionButton(
-                heroTag: null,
-                onPressed: () {
-                  feedBack();
-                  controller.onReply(
-                    null,
-                    oid: controller.aid,
-                    replyType: controller.videoType.replyType,
-                    mentionItem: controller.mentionItem,
-                  );
-                },
-                tooltip: '发表评论',
-                child: const Icon(Icons.reply),
+              child: NativeCommentButton(
+                child: FloatingActionButton(
+                  heroTag: null,
+                  onPressed: () {
+                    feedBack();
+                    controller.onReply(
+                      null,
+                      oid: controller.aid,
+                      replyType: controller.videoType.replyType,
+                      mentionItem: controller.mentionItem,
+                    );
+                  },
+                  tooltip: '发表评论',
+                  child: const Icon(Icons.reply),
+                ),
               ),
             ),
           ),
