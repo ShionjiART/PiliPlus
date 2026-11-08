@@ -319,14 +319,8 @@ final class NativeTabBarController: UITabBarController, UITabBarControllerDelega
   }
   private var isVerticalBarHidden: Bool {
     guard hasVerticalBar else { return false }
-    if isInnerDisplay { return false }
-    if isPlayerFullScreen { return true }
-    guard let videoChrome else { return false }
-    if videoChrome["fullScreen"] as? Bool ?? false { return true }
-    // The outer screen shows status icons only when its video header has
-    // collapsed. Player controls and their lock/timer do not own this state.
-    return !(videoChrome["collapsed"] as? Bool ?? false)
-      && !(videoChrome["paused"] as? Bool ?? false)
+    return DuoStatusBarPolicy.hidesStatusIcons(
+      inner: isInnerDisplay, playerFullScreen: isPlayerFullScreen, video: videoChrome)
   }
   private var sentVerticalBarHidden = false
 
@@ -457,6 +451,18 @@ extension Array {
 }
 
 // MARK: - Fold orientation policy
+
+/// Fullscreen takes precedence over the inner display's normal persistent icons.
+/// Either fullscreen signal is sufficient while Dart/native updates settle.
+struct DuoStatusBarPolicy {
+  static func hidesStatusIcons(inner: Bool, playerFullScreen: Bool, video: [String: Any]?) -> Bool {
+    if playerFullScreen || (video?["fullScreen"] as? Bool ?? false) { return true }
+    if inner { return false }
+    guard let video else { return false }
+    return !(video["collapsed"] as? Bool ?? false)
+      && !(video["paused"] as? Bool ?? false)
+  }
+}
 
 /// A missing/unknown hinge update means the hierarchy is moving, not closing.
 /// Keep the last authoritative posture until another valid update arrives.

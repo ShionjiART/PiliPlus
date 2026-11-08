@@ -1,3 +1,5 @@
+import 'package:PiliPlus/pages/video/widgets/collapsed_video_toolbar.dart';
+
 import 'dart:async';
 import 'dart:io' show Platform;
 import 'dart:math';
@@ -865,77 +867,65 @@ class _VideoDetailPageVState extends State<_VideoDetailPageContent>
       child: Container(
         color: colorScheme.surface,
         alignment: .topCenter,
-        child: SizedBox(
-          height: kToolbarHeight,
-          child: Stack(
-            clipBehavior: .none,
+        child: CollapsedVideoToolbar(
+          fullScreen: isFullScreen,
+          leading: Row(
+            mainAxisSize: .min,
             children: [
-              Align(
-                alignment: .centerLeft,
-                child: Row(
-                  mainAxisSize: .min,
-                  children: [
-                    if (!IOSNativeTabBar.usesNativeVideoNavigation(context) &&
-                        !IOSNativeTabBar.hasNativeBack(context))
-                      SizedBox(
-                        width: 42,
-                        height: 34,
-                        child: IconButton(
-                          tooltip: '返回',
-                          icon: Icon(
-                            FontAwesomeIcons.arrowLeft,
-                            size: 15,
-                            color: colorScheme.onSurface,
-                          ),
-                          onPressed: Get.back,
-                        ),
-                      ),
-                    if (!IOSNativeTabBar.usesNativeVideoNavigation(context))
-                      SizedBox(
-                        width: 42,
-                        height: 34,
-                        child: IconButton(
-                          tooltip: '返回主页',
-                          icon: Icon(
-                            FontAwesomeIcons.house,
-                            size: 15,
-                            color: colorScheme.onSurface,
-                          ),
-                          onPressed: videoDetailController
-                              .plPlayerController
-                              .onCloseAll,
-                        ),
-                      ),
-                  ],
+              if (!IOSNativeTabBar.usesNativeVideoNavigation(context) &&
+                  !IOSNativeTabBar.hasNativeBack(context))
+                SizedBox(
+                  width: 42,
+                  height: 34,
+                  child: IconButton(
+                    tooltip: '返回',
+                    icon: Icon(
+                      FontAwesomeIcons.arrowLeft,
+                      size: 15,
+                      color: colorScheme.onSurface,
+                    ),
+                    onPressed: Get.back,
+                  ),
                 ),
-              ),
-              Center(child: playBtn),
-              Align(
-                alignment: .centerRight,
-                child: videoDetailController.playedTime == null
-                    ? _moreBtn(colorScheme.onSurface)
-                    : SizedBox(
-                        width: 42,
-                        height: 34,
-                        child: IconButton(
-                          tooltip: "更多设置",
-                          style: const ButtonStyle(
-                            padding: WidgetStatePropertyAll(EdgeInsets.zero),
-                          ),
-                          onPressed: () =>
-                              (videoDetailController.headerCtrKey.currentState
-                                      as HeaderControlState?)
-                                  ?.showSettingSheet(),
-                          icon: Icon(
-                            Icons.more_vert_outlined,
-                            size: 19,
-                            color: colorScheme.onSurface,
-                          ),
-                        ),
-                      ),
-              ),
+              if (!IOSNativeTabBar.usesNativeVideoNavigation(context))
+                SizedBox(
+                  width: 42,
+                  height: 34,
+                  child: IconButton(
+                    tooltip: '返回主页',
+                    icon: Icon(
+                      FontAwesomeIcons.house,
+                      size: 15,
+                      color: colorScheme.onSurface,
+                    ),
+                    onPressed:
+                        videoDetailController.plPlayerController.onCloseAll,
+                  ),
+                ),
             ],
           ),
+          title: playBtn,
+          trailing: videoDetailController.playedTime == null
+              ? _moreBtn(colorScheme.onSurface)
+              : SizedBox(
+                  width: 42,
+                  height: 34,
+                  child: IconButton(
+                    tooltip: "更多设置",
+                    style: const ButtonStyle(
+                      padding: WidgetStatePropertyAll(EdgeInsets.zero),
+                    ),
+                    onPressed: () =>
+                        (videoDetailController.headerCtrKey.currentState
+                                as HeaderControlState?)
+                            ?.showSettingSheet(),
+                    icon: Icon(
+                      Icons.more_vert_outlined,
+                      size: 19,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                ),
         ),
       ),
     );

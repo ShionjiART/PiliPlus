@@ -57,3 +57,24 @@ func checkDuoDisplayDirections() -> [String] {
   return ["Display-relative upright directions cover four physical poses",
     "Fullscreen cannot overwrite a learned normal baseline"]
 }
+
+
+func checkDuoStatusBarPolicy() -> [String] {
+  for inner in [false, true] {
+    // Normal inner pages keep icons; expanded playing outer video hides them.
+    precondition(DuoStatusBarPolicy.hidesStatusIcons(inner: inner, playerFullScreen: false,
+      video: ["fullScreen": false, "paused": false, "collapsed": false]) == !inner)
+    for video in [["paused": true], ["collapsed": true], ["paused": true, "collapsed": true]] {
+      precondition(!DuoStatusBarPolicy.hidesStatusIcons(inner: inner, playerFullScreen: false, video: video))
+    }
+    // Native state can arrive before metadata, or metadata before native state.
+    for video in [nil, ["fullScreen": false], ["paused": true, "collapsed": true]] as [[String: Any]?] {
+      precondition(DuoStatusBarPolicy.hidesStatusIcons(inner: inner, playerFullScreen: true, video: video))
+    }
+    precondition(DuoStatusBarPolicy.hidesStatusIcons(inner: inner, playerFullScreen: false,
+      video: ["fullScreen": true, "paused": true, "collapsed": true]))
+    precondition(!DuoStatusBarPolicy.hidesStatusIcons(inner: inner, playerFullScreen: false, video: nil))
+  }
+  return ["Both displays hide status icons in fullscreen, independent of update ordering",
+    "Exiting fullscreen restores inner persistence and outer pause/collapse visibility"]
+}
