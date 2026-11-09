@@ -39,9 +39,12 @@ class SideSafeArea extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final padding = MediaQuery.paddingOf(context);
-    if (padding.left == 0 && padding.right == 0) return child;
+    // Keep the same tree without an inset: rotating or folding can change the
+    // inset to or from zero, and the page must keep its state.
     return ColoredBox(
-      color: Theme.of(context).scaffoldBackgroundColor,
+      color: padding.left == 0 && padding.right == 0
+          ? Colors.transparent
+          : Theme.of(context).scaffoldBackgroundColor,
       child: SafeArea(top: false, bottom: false, child: child),
     );
   }
