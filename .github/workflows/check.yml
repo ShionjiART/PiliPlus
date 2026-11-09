@@ -1,0 +1,42 @@
+name: Check
+
+# 合并到 release 的 PR 自动跑代码检查和单元测试，见 CLAUDE.md「每个改动的流程」。
+on:
+  pull_request:
+    branches:
+      - release
+  push:
+    branches:
+      - release
+  workflow_dispatch:
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Analyze and test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      # 与 ios.yml 一样不用缓存：缓存会把打过补丁的 SDK 存下来，下次再打补丁会失败。
+      - name: Setup flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+
+      # 和本地编译一样打 iOS 补丁，脚本里会顺带执行 flutter pub get。
+      - name: Apply Patch
+        shell: pwsh
+        run: lib/scripts/patch.ps1 iOS
+
+      # 上游代码有不少 info 级别的提示，只在 warning 和 error 时失败。
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+
+      - name: Test
+        run: flutter test
