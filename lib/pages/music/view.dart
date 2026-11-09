@@ -563,7 +563,7 @@ class _MusicDetailPageState extends CommonDynPageState<MusicDetailPage> {
                   _buildRank(
                     item.musicRelation,
                     '使用稿件量',
-                    () => Get.to(
+                    () => Get.toSafe(
                       const MusicRecommendPage(),
                       arguments: (id: controller.musicId, item: item),
                     ),

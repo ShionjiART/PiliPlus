@@ -30,6 +30,7 @@ import 'package:PiliPlus/utils/path_utils.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/theme_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart' hide TextField;
@@ -281,7 +282,7 @@ class _ReplyPageState extends CommonRichTextPubPageState<ReplyPage> {
         children: [
           item(
             onTap: () async {
-              final ({String title, String url})? res = await Get.to(
+              final ({String title, String url})? res = await Get.toSafe(
                 ReplySearchPage(type: widget.replyType, oid: widget.oid),
               );
               if (res != null) {

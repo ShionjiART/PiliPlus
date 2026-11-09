@@ -18,6 +18,7 @@ import 'package:PiliPlus/utils/extension/widget_ext.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
 import 'package:PiliPlus/utils/num_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:easy_debounce/easy_throttle.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
@@ -199,7 +200,7 @@ class _MainReplyPageState extends State<MainReplyPage>
   }
 
   void replyReply(ReplyInfo replyItem, int? id) {
-    Get.to(
+    Get.toSafe(
       SimpleScaffold(
         appBar: AppBar(
           title: const Text('评论详情'),

@@ -12,6 +12,7 @@ import 'package:PiliPlus/utils/bili_utils.dart';
 import 'package:PiliPlus/utils/extension/num_ext.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:get/get_core/src/get_main.dart';
 import 'package:get/get_navigation/src/extension_navigation.dart';
 import 'package:material_ui/material_ui.dart';
@@ -103,7 +104,7 @@ class PageInfoItem<T extends MultiSelectData> extends StatelessWidget {
             controller.onSelect(seasonInfo);
             return;
           }
-          Get.to(
+          Get.toSafe(
             DownloadDetailPage(
               pageId: pageInfo.pageId,
               title: pageInfo.title,

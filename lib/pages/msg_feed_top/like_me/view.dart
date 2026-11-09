@@ -18,6 +18,7 @@ import 'package:PiliPlus/pages/whisper_settings/view.dart';
 import 'package:PiliPlus/utils/app_scheme.dart';
 import 'package:PiliPlus/utils/date_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart' hide ListTile;
 
@@ -39,7 +40,7 @@ class _LikeMePageState extends State<LikeMePage> {
         title: const Text('收到的赞'),
         actions: [
           IconButton(
-            onPressed: () => Get.to(
+            onPressed: () => Get.toSafe(
               const WhisperSettingsPage(
                 imSettingType: IMSettingType.SETTING_TYPE_OLD_RECEIVE_LIKE,
               ),

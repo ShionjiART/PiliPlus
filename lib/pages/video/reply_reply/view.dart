@@ -20,6 +20,7 @@ import 'package:PiliPlus/utils/app_scheme.dart';
 import 'package:PiliPlus/utils/extension/widget_ext.dart';
 import 'package:PiliPlus/utils/num_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:extended_nested_scroll_view/extended_nested_scroll_view.dart';
 import 'package:fixnum/fixnum.dart' show Int64;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
@@ -58,7 +59,7 @@ class VideoReplyReplyPanel extends CommonSlidePage {
     required int type,
     Uri? uri,
   }) {
-    return Get.to(
+    return Get.toSafe(
       arguments: {
         'oid': oid,
         'rpid': rootId,

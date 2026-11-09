@@ -29,6 +29,7 @@ import 'package:PiliPlus/utils/reply_scheme_helper.dart';
 import 'package:PiliPlus/utils/request_utils.dart';
 import 'package:PiliPlus/utils/url_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:app_links/app_links.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
@@ -387,7 +388,7 @@ abstract final class PiliScheme {
             }
             return false;
           case 'livearea':
-            Get.to(
+            Get.toSafe(
               SimpleScaffold(
                 appBar: AppBar(title: const Text('直播')),
                 body: const ViewSafeArea(child: LivePage()),
@@ -395,7 +396,7 @@ abstract final class PiliScheme {
             );
             return true;
           case 'rank':
-            Get.to(
+            Get.toSafe(
               SimpleScaffold(
                 appBar: AppBar(title: const Text('排行榜')),
                 body: const ViewSafeArea(child: RankPage()),

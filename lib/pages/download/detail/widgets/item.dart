@@ -21,6 +21,7 @@ import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/path_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
@@ -147,7 +148,7 @@ class DetailItem extends StatelessWidget {
       child: InkWell(
         onTap: () async {
           if (!canDel) {
-            Get.to(const DownloadingPage());
+            Get.toSafe(const DownloadingPage());
             return;
           }
           if (enableMultiSelect) {

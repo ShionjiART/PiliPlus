@@ -22,6 +22,7 @@ import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
@@ -291,7 +292,7 @@ List<SettingsModel> get playSettings => [
     title: '全屏 SuperChat 设置',
     subtitle: '全屏 SuperChat (醒目留言) 大小、不透明度、缩放设置',
     leading: const Icon(Icons.open_in_full),
-    onTap: (_, _) => Get.to(const FullScreenSc()),
+    onTap: (_, _) => Get.toSafe(const FullScreenSc()),
   ),
   const SwitchModel(
     title: '竖屏扩大展示',

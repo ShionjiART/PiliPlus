@@ -12,6 +12,7 @@ import 'package:PiliPlus/pages/live_area/controller.dart';
 import 'package:PiliPlus/pages/live_area_detail/view.dart';
 import 'package:PiliPlus/pages/search/widgets/search_text.dart';
 import 'package:PiliPlus/utils/extension/iterable_ext.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:flutter_sortable_wrap/sortable_wrap.dart';
 import 'package:get/get.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
@@ -234,7 +235,7 @@ class _LiveAreaPageState extends State<LiveAreaPage> {
           return;
         }
 
-        Get.to(
+        Get.toSafe(
           LiveAreaDetailPage(
             areaId: item.id,
             parentAreaId: item.parentId,
@@ -329,7 +330,7 @@ class _LiveAreaPageState extends State<LiveAreaPage> {
                 return;
               }
 
-              Get.to(
+              Get.toSafe(
                 LiveAreaDetailPage(
                   areaId: item.id,
                   parentAreaId: item.parentId,
