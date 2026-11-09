@@ -1188,7 +1188,7 @@ packages:
     description:
       path: "libs/ios/media_kit_libs_ios_video"
       ref: "feat/ios-av1-hwdec"
-      resolved-ref: "0e1e80defb6f847594b4db445bbfcf0795aa5187"
+      resolved-ref: a947586e84a6d29acaa5eb1ca13e16eba923c98b
       url: "https://github.com/ShionjiART/media-kit.git"
     source: git
     version: "1.1.4"
