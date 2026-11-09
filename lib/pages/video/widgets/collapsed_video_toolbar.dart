@@ -10,12 +10,14 @@ class CollapsedVideoToolbar extends StatelessWidget {
     required this.title,
     required this.trailing,
     required this.fullScreen,
-  });
+    this.topInset = 0,
+  }) : assert(topInset >= 0);
 
   final Widget leading;
   final Widget title;
   final Widget trailing;
   final bool fullScreen;
+  final double topInset;
 
   @override
   Widget build(BuildContext context) => VideoDetailBodyInsets(
@@ -23,13 +25,16 @@ class CollapsedVideoToolbar extends StatelessWidget {
     fullScreen: fullScreen,
     child: SizedBox(
       height: kToolbarHeight,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Align(alignment: Alignment.centerLeft, child: leading),
-          Center(child: title),
-          Align(alignment: Alignment.centerRight, child: trailing),
-        ],
+      child: Padding(
+        padding: EdgeInsets.only(top: fullScreen ? 0 : topInset),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Align(alignment: Alignment.centerLeft, child: leading),
+            Center(child: title),
+            Align(alignment: Alignment.centerRight, child: trailing),
+          ],
+        ),
       ),
     ),
   );

@@ -64,11 +64,16 @@ class StableVideoViewport extends StatefulWidget {
     super.key,
     required this.enabled,
     required this.windowSize,
+    this.edgeToEdgeTop = false,
     required this.child,
   });
 
   final bool enabled;
   final Size windowSize;
+
+  /// General rail pages keep a top gutter; the outer video canvas does not.
+  /// Its collapsed controls retain their own inset from RailViewportScope.
+  final bool edgeToEdgeTop;
   final Widget child;
 
   @override
@@ -94,11 +99,12 @@ class _StableVideoViewportState extends State<StableVideoViewport> {
       _top = query.viewPadding.top;
       _bottom = query.viewPadding.bottom;
     }
+    final top = widget.edgeToEdgeTop ? 0.0 : _top;
     return MediaQuery(
       data: query.copyWith(
-        viewPadding: query.viewPadding.copyWith(top: _top, bottom: _bottom),
+        viewPadding: query.viewPadding.copyWith(top: top, bottom: _bottom),
         padding: query.padding.copyWith(
-          top: max(0, _top - query.viewInsets.top),
+          top: max(0, top - query.viewInsets.top),
           bottom: max(0, _bottom - query.viewInsets.bottom),
         ),
       ),

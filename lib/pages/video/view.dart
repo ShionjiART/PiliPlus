@@ -1,3 +1,4 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
 import 'package:PiliPlus/pages/video/widgets/collapsed_video_toolbar.dart';
 
 import 'dart:async';
@@ -99,15 +100,24 @@ class VideoDetailPageV extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rawInsets = IOSNativeTabBar.safeArea.value;
+    final railInsets = RailViewportScope.of(context)?.insets;
     final hasSideBar =
         (rawInsets?.right ?? 0) >= 72 ||
         (rawInsets?.left ?? 0) >= 72 ||
+        (railInsets?.right ?? 0) > 0 ||
         IOSNativeTabBar.usesNativeVideoNavigation(context);
     return ValueListenableBuilder<bool>(
       valueListenable: IOSNativeTabBar.playerFullScreen,
       builder: (context, fullScreen, child) => StableVideoViewport(
         enabled: IOSFoldableHelper.isIPhone && hasSideBar && !fullScreen,
         windowSize: MediaQuery.sizeOf(context),
+        edgeToEdgeTop:
+            IOSNativeTabBar.rightRailDevice.value &&
+            isOuterPortraitVideoLayout(
+              windowSize: DeviceUtils.size,
+              isIPhone: IOSFoldableHelper.isIPhone,
+              hasSideBar: hasSideBar,
+            ),
         child: child!,
       ),
       child: const _VideoDetailPageContent(),
@@ -869,6 +879,10 @@ class _VideoDetailPageVState extends State<_VideoDetailPageContent>
         alignment: .topCenter,
         child: CollapsedVideoToolbar(
           fullScreen: isFullScreen,
+          topInset:
+              _usesOuterPortraitLayout && IOSNativeTabBar.rightRailDevice.value
+              ? (RailViewportScope.of(context)?.insets.top ?? 0)
+              : 0,
           leading: Row(
             mainAxisSize: .min,
             children: [
