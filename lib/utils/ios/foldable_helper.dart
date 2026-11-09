@@ -6,7 +6,8 @@ import 'package:PiliPlus/utils/device_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
+import 'package:flutter/foundation.dart'
+    show debugPrint, kDebugMode, visibleForTesting;
 import 'package:flutter/widgets.dart'
     show WidgetsBinding, WidgetsBindingObserver;
 
@@ -28,12 +29,17 @@ abstract final class IOSFoldableHelper {
   /// 当前设备是否为 iPhone（不含 iPad）
   static bool get isIPhone => _isIPhone;
 
-  /// 横屏适配是否由折叠状态自动决定
+  @visibleForTesting
+  static set debugIsIPhone(bool value) => _isIPhone = value;
+
+  /// 横屏适配是否由折叠状态自动决定。
+  /// 尚未选择过时，已手动开启旧开关的用户保持开启
   static bool get isAuto =>
       _isIPhone &&
       GStorage.setting.get(
         SettingBoxKey.foldableAutoHorizontal,
-        defaultValue: true,
+        defaultValue:
+            GStorage.setting.get(SettingBoxKey.horizontalScreen) != true,
       );
 
   /// 当前是否处于展开状态（窗口最短边 >= 600pt）
