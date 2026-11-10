@@ -22,6 +22,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
+      # flutter test 会先编译依赖包的本地代码（如 cnativeapi 需要 GTK 3、X11、Xi），
+      # 和 linux_x64.yml 装同一批系统库，再补上 Xi。
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libx11-dev libxi-dev webkit2gtk-4.1 libasound2-dev libmpv-dev
+
       # 与 ios.yml 一样不用缓存：缓存会把打过补丁的 SDK 存下来，下次再打补丁会失败。
       - name: Setup flutter
         uses: subosito/flutter-action@v2
