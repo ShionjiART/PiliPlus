@@ -34,6 +34,14 @@ jobs:
         shell: pwsh
         run: lib/scripts/patch.ps1 iOS
 
+      # 补丁脚本还会改仓库里的代码供打包使用（极验插件、底部弹窗），其中会留下
+      # 执行不到的代码。检查的是提交的代码，所以还原仓库文件，只保留 SDK 上的补丁。
+      - name: Restore repository files
+        run: |
+          git checkout -- .
+          git clean -fd -- lib
+          flutter pub get
+
       # 上游代码有不少 info 级别的提示，只在 warning 和 error 时失败。
       - name: Analyze
         run: flutter analyze --no-fatal-infos
