@@ -199,9 +199,9 @@ dependency_overrides:
       ref: native
   media_kit_libs_ios_video:
     git:
-      url: https://github.com/My-Responsitories/media-kit.git
+      url: https://github.com/ShionjiART/media-kit.git
       path: libs/ios/media_kit_libs_ios_video
-      ref: native
+      ref: feat/ios-av1-hwdec
   media_kit_libs_video:
     git:
       url: https://github.com/My-Responsitories/media-kit.git
