@@ -9,8 +9,17 @@
 | 分支 | 用途 |
 |---|---|
 | `release` | 默认分支，长期主线。所有新改动都合并到这里 |
-| `feat/iphone-duo` | 最初的 Duo 适配，已冻结，不再提交或合并任何东西 |
 | `main` | 只同步上游，不放自己的改动 |
+
+最初的 Duo 适配已冻结为标签 [`iphone-duo-v1`](https://github.com/ShionjiART/PiliPlus/releases/tag/iphone-duo-v1)，原来的 `feat/iphone-duo` 分支已删除。
+
+## 标签
+
+标签用来标记版本，不用来标记单个改动：
+
+- 冻结的版本、打出来给人用的安装包，打一个标签并发布 Release，例如 `iphone-duo-v1`、`duo-2.2.0-1`。
+- 没有合并就放弃、但想留着的分支，删除前先打标签 `archive/分支名`，否则它的提交会丢失。
+- fork 时从上游复制来了约 150 个标签。自己的标签统一用 `iphone-duo-`、`duo-`、`archive/` 开头，以便区分。
 
 ## 每个改动的流程
 
@@ -18,7 +27,7 @@
 2. 多个改动同时进行时，每个都在自己的 git worktree 里做，不要在同一个文件夹里切换分支。
 3. 改完后跑 `flutter analyze` 和相关测试。涉及界面的改动，在 iPhone Duo 模拟器上检查合上、展开和旋转；并行时每个任务新建自己的模拟器，不要共用。
 4. 在本仓库开 PR 合并到 `release`，说明改了什么、为什么改、怎么测的。
-5. 用 merge commit 合并，不用 squash。合并后保留分支，不删除。
+5. 用 merge commit 合并，不用 squash。合并后删除分支（本地和 GitHub 上都删）；改动记录保留在 PR 页面，需要时可以从 PR 页面恢复分支。还要用的分支先保留，例如准备提给上游的分支。
 
 ## 提交
 
