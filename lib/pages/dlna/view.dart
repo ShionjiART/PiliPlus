@@ -6,6 +6,7 @@ import 'package:PiliPlus/common/widgets/loading_widget/loading_widget.dart';
 import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
 import 'package:PiliPlus/common/widgets/view_sliver_safe_area.dart';
 import 'package:PiliPlus/utils/device_utils.dart';
+import 'package:PiliPlus/utils/dlna_searcher.dart';
 import 'package:PiliPlus/utils/dlna_utils.dart';
 import 'package:PiliPlus/utils/permission_handler.dart';
 import 'package:dlna_dart/dlna.dart';
@@ -20,7 +21,7 @@ class DLNAPage extends StatefulWidget {
 }
 
 class _DLNAPageState extends State<DLNAPage> {
-  final _searcher = DLNAManager();
+  final _searcher = DlnaSearcher();
   final Map<String, DLNADevice> _deviceList = {};
   late final _url = Get.parameters['url']!;
   late final _title = Get.parameters['title'];
@@ -65,8 +66,8 @@ class _DLNAPageState extends State<DLNAPage> {
           setState(() {});
         }
       }
-    } catch (_) {
-      _searchError = '搜索设备失败，请检查网络后重试';
+    } catch (e) {
+      _searchError = '搜索设备失败，请检查网络后重试\n$e';
     } finally {
       _timer?.cancel();
       _timer = null;
@@ -125,8 +126,15 @@ class _DLNAPageState extends State<DLNAPage> {
           onReload: permanentlyDenied ? openAppSettings : _onSearch,
         );
       }
+      final lastError = _searcher.lastError;
       return HttpError(
-        errMsg: _searchError ?? '没有设备',
+        errMsg:
+            _searchError ??
+            (_searcher.noLan
+                ? '没有设备\n没有找到局域网连接，请连接和电视相同的 Wi-Fi'
+                : lastError == null
+                ? '没有设备'
+                : '没有设备\n搜索时出错：$lastError'),
         onReload: _onSearch,
       );
     }
