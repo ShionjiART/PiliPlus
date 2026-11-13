@@ -83,7 +83,7 @@ List<SettingsModel> get videoSettings => [
     ),
     const SwitchModel(
       title: '所有视频均采用系统播放器',
-      subtitle: '实验性功能，部分功能暂不可用',
+      subtitle: '实验性功能，播放失败时自动改用内置播放器',
       leading: Icon(Icons.smart_display_outlined),
       setKey: SettingBoxKey.systemPlayerAll,
       confirmChange: _confirmSystemPlayerAll,
