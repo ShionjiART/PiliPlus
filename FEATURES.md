@@ -27,6 +27,7 @@
 - [x] 修复开启「改用侧边栏」后首页搜索栏和头像消失：iOS 26 起的 iPhone 由系统标签栏负责导航，这个设置不再生效并在设置里置灰（普通 iPhone 也适用）（[#19](https://github.com/ShionjiART/PiliPlus/pull/19)）
 - [x] 合上时二级页面在竖状态栏显示返回键，页面左上角的返回键保留；首页等一级页面和视频页不显示，弹窗不影响（[#21](https://github.com/ShionjiART/PiliPlus/pull/21)）
 - [x] 一级页面的竖状态栏顶部放头像，以及搜索和私信的组合按钮，私信带未读角标；未登录时不显示私信，头像点了去登录；首页顶部的头像在 Duo 上去掉（[#22](https://github.com/ShionjiART/PiliPlus/pull/22)）
+- [x] 视频页的底部弹窗（长按评论的菜单、分享、收藏、缓存、转发、播放器设置等）和页面一样铺满竖状态栏的位置，右边不再留出一条（[#25](https://github.com/ShionjiART/PiliPlus/pull/25)）
 - [ ] 移植 [@Stasert](https://github.com/Stasert) 的竖栏导航等功能，进度见 [#2](https://github.com/ShionjiART/PiliPlus/issues/2)
 
 ## 播放

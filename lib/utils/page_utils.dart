@@ -28,6 +28,7 @@ import 'package:PiliPlus/utils/extension/string_ext.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
 import 'package:PiliPlus/utils/global_data.dart';
 import 'package:PiliPlus/utils/id_utils.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/reply_scheme_helper.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
@@ -104,7 +105,7 @@ abstract final class PageUtils {
           content: content,
           userList: userList,
         ),
-        useSafeArea: true,
+        useSafeArea: IOSNativeTabBar.sheetUseSafeArea,
         enableDrag: false,
         isScrollControlled: true,
       );
@@ -158,7 +159,7 @@ abstract final class PageUtils {
   }) {
     showModalBottomSheet(
       context: context,
-      useSafeArea: true,
+      useSafeArea: IOSNativeTabBar.sheetUseSafeArea,
       isScrollControlled: true,
       constraints: BoxConstraints(
         maxWidth: min(640, context.mediaQueryShortestSide),
@@ -472,7 +473,14 @@ abstract final class PageUtils {
       PublishRoute(
         pageBuilder: (context, animation, secondaryAnimation) {
           final isPortrait = context.isPortrait;
-          return SafeArea(
+          // 竖状态栏隐藏时（iPhone Duo 视频页）左右铺满，和页面内容一致
+          return ValueListenableBuilder(
+            valueListenable: IOSNativeTabBar.verticalBarHidden,
+            builder: (context, verticalBarHidden, child) => SafeArea(
+              left: !verticalBarHidden,
+              right: !verticalBarHidden,
+              child: child!,
+            ),
             child: CustomFractionallySizedBox(
               maxWidth: maxWidth,
               widthFactor: isPortrait ? 1.0 : 0.5,

@@ -45,6 +45,7 @@ import 'package:PiliPlus/utils/extension/theme_ext.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
 import 'package:PiliPlus/utils/global_data.dart';
 import 'package:PiliPlus/utils/image_utils.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
@@ -450,7 +451,7 @@ class ReplyItemGrpc extends StatelessWidget {
 
   void _showMore(BuildContext context) => showModalBottomSheet(
     context: context,
-    useSafeArea: true,
+    useSafeArea: IOSNativeTabBar.sheetUseSafeArea,
     isScrollControlled: true,
     constraints: BoxConstraints(
       maxWidth: min(640, context.mediaQueryShortestSide),
@@ -885,7 +886,7 @@ class ReplyItemGrpc extends StatelessWidget {
 
     void showMore() => showModalBottomSheet(
       context: context,
-      useSafeArea: true,
+      useSafeArea: IOSNativeTabBar.sheetUseSafeArea,
       isScrollControlled: true,
       constraints: BoxConstraints(
         maxWidth: min(640, context.mediaQueryShortestSide),

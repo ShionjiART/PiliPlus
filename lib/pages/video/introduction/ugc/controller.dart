@@ -36,6 +36,7 @@ import 'package:PiliPlus/utils/extension/string_ext.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
 import 'package:PiliPlus/utils/global_data.dart';
 import 'package:PiliPlus/utils/id_utils.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/request_utils.dart';
@@ -403,7 +404,7 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
                 showModalBottomSheet(
                   context: context,
                   isScrollControlled: true,
-                  useSafeArea: true,
+                  useSafeArea: IOSNativeTabBar.sheetUseSafeArea,
                   builder: (context) => RepostPanel(
                     rid: videoDetail.aid,
                     dynType: 8,
