@@ -18,6 +18,7 @@
 - [x] 合上时播放器底部的进度条铺满整行（摄像头只在竖栏顶部，挡不到），下面一排按钮仍避开竖栏，合上全屏也一样（[#35](https://github.com/ShionjiART/PiliPlus/pull/35)）。控件隐藏时的细进度条起初改成避开竖栏（[#24](https://github.com/ShionjiART/PiliPlus/pull/24)），后来改回铺满（[#35](https://github.com/ShionjiART/PiliPlus/pull/35)）
 - [x] 合上全屏时左边的锁定按钮（竖栏在右边时是右边的截图按钮）和进度条一样铺到竖栏上，不再空出一截；普通 iPhone 横屏时仍避开灵动岛
 - [x] 视频页隐藏时间和 Wi-Fi，内容铺满竖状态栏的位置（合上和展开都是）
+- [x] 视频页的对话框（播放信息等）在整个屏幕里居中，不再往左上偏：竖状态栏隐藏时不再让开它，上下也留出相同的边距，较高的对话框不会碰到摄像头
 - [x] 展开后视频页右栏加宽，相关视频的 ⋮ 按钮不再被遮住
 - [x] 动态流合上时单列、展开时双列，不再因为合上状态启动就一直是单列（[#23](https://github.com/ShionjiART/PiliPlus/pull/23)）
 - [x] 保存评论和动态的图片不再比直板手机宽：最多 402pt，和普通 iPhone 一致（[#20](https://github.com/ShionjiART/PiliPlus/pull/20)）

@@ -125,6 +125,8 @@ void main() async {
       IOSNativeTabBar.onBack = () async => _onBack();
       // 竖状态栏里有返回键时，页面左上角不再重复显示
       AppBar.hideImpliedBackButton = IOSNativeTabBar.hidesPageBackButton;
+      // 视频页的对话框在整个屏幕里居中，不再让开已隐藏的竖状态栏
+      DialogRoute.safeAreaBuilder = IOSNativeTabBar.dialogSafeArea;
     }
     await Future.wait([
       if (Pref.horizontalScreen) ?fullMode() else ?portraitUpMode(),
