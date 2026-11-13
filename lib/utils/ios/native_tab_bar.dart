@@ -141,6 +141,10 @@ abstract final class IOSNativeTabBar {
   /// 存在（摄像头在其中），页面内容可以忽略它铺满
   static final verticalBarHidden = ValueNotifier(false);
 
+  /// 底部弹窗的 `useSafeArea`。竖状态栏隐藏时（视频页）弹窗和页面内容一样
+  /// 铺满竖状态栏的位置，不再按它的安全区在一侧留出空白
+  static bool get sheetUseSafeArea => !verticalBarHidden.value;
+
   /// 状态栏在竖状态栏中时（iPhone Duo）隐藏状态栏，让页面铺满竖状态栏的位置。
   /// 状态栏在顶部时不生效。
   ///

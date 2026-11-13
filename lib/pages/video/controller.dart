@@ -61,6 +61,7 @@ import 'package:PiliPlus/utils/extension/context_ext.dart';
 import 'package:PiliPlus/utils/extension/nested_scroll_ext.dart';
 import 'package:PiliPlus/utils/extension/num_ext.dart';
 import 'package:PiliPlus/utils/extension/size_ext.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/path_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
@@ -1653,7 +1654,7 @@ class VideoDetailController extends GetxController
 
       showModalBottomSheet(
         context: context,
-        useSafeArea: true,
+        useSafeArea: IOSNativeTabBar.sheetUseSafeArea,
         isScrollControlled: true,
         constraints: BoxConstraints(
           maxWidth: min(640, context.mediaQueryShortestSide),
