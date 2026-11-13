@@ -16,6 +16,7 @@ class SystemPlayerTrack {
 
   /// End of `segment_base.index_range`: the file head up to here holds
   /// ftyp + moov + sidx, from which the native side builds an HLS playlist.
+  /// 0 when unknown: the native side then reads the first 512 KB.
   final int indexEnd;
   final int bandwidth;
 
@@ -27,16 +28,14 @@ class SystemPlayerTrack {
     bandwidth: 0,
   );
 
-  /// Returns null when the stream has no usable segment index.
-  static SystemPlayerTrack? fromItem(BaseItem item, String url) {
-    final range =
-        item.segmentBase?['index_range'] ?? item.segmentBase?['indexRange'];
+  static SystemPlayerTrack fromItem(BaseItem? item, String url) {
+    final base = item?.segmentBase;
+    final range = base?['index_range'] ?? base?['indexRange'];
     final end = range is String ? int.tryParse(range.split('-').last) : null;
-    if (end == null || end <= 0) return null;
     return SystemPlayerTrack(
       url: url,
-      indexEnd: end,
-      bandwidth: item.bandWidth ?? 0,
+      indexEnd: end != null && end > 0 ? end : 0,
+      bandwidth: item?.bandWidth ?? 0,
     );
   }
 
@@ -130,7 +129,14 @@ class SystemPlayer {
     return SystemPlayer._(id!);
   }
 
-  /// Returns an error message, or null on success.
+  /// `load` result when it was cancelled (superseded or the page closed).
+  static const cancelled = 'cancelled';
+
+  /// `load` result for a source known not to play (e.g. a downloaded `hev1`
+  /// file); mpv takes over without a message.
+  static const unsupported = 'unsupported';
+
+  /// Returns an error message, [cancelled], [unsupported], or null on success.
   Future<String?> load(
     SystemPlayerSource source, {
     required Map<String, String> headers,

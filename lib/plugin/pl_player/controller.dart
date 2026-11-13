@@ -1067,6 +1067,13 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     );
     if (error != null) {
       if (kDebugMode) debugPrint('system player failed: $error');
+      // Cancelled, known not to play, or the page closed meanwhile: mpv
+      // takes over without a message.
+      if (error == SystemPlayer.cancelled ||
+          error == SystemPlayer.unsupported ||
+          _playerCount == 0) {
+        return false;
+      }
       SmartDialog.showToast(
         '系统播放器无法播放，已改用内置播放器\n$error',
         displayTime: const Duration(seconds: 5),

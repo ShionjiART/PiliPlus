@@ -124,6 +124,10 @@ final class SystemPlayerPlugin: NSObject, FlutterPlugin, FlutterStreamHandler {
 }
 
 final class SystemPlayerSession: NSObject {
+  /// `load` result when it was cancelled; not an error to show.
+  static let cancelled = "cancelled"
+  /// `load` result for a source known not to work; mpv plays it, no message.
+  static let unsupported = "unsupported"
   let player = AVPlayer()
   private let emit: (String, [String: Any]) -> Void
   private var loader: SystemPlayerPlaylistLoader?
@@ -140,6 +144,8 @@ final class SystemPlayerSession: NSObject {
   private var videoURL: URL?
   private var audioURL: URL?
   private var frameRate: Double?
+  /// Catches failures AVPlayer does not report as errors, so mpv can take over.
+  private var watchdog: Timer?
 
   init(emit: @escaping (String, [String: Any]) -> Void) {
     self.emit = emit
@@ -193,6 +199,7 @@ final class SystemPlayerSession: NSObject {
         item.preferredForwardBufferDuration = 30
         self.observe(item)
         self.player.replaceCurrentItem(with: item)
+        self.startWatchdog(item)
         if startMs > 0 {
           await self.player.seek(
             to: CMTime(value: CMTimeValue(startMs), timescale: 1000),
@@ -200,6 +207,13 @@ final class SystemPlayerSession: NSObject {
         }
         completion(nil)
       } catch {
+        // Superseded by another load, or the page closed while loading.
+        if Task.isCancelled || (error as? URLError)?.code == .cancelled {
+          return completion(SystemPlayerSession.cancelled)
+        }
+        if case SystemPlayerLocalError.hev1 = error {
+          return completion(SystemPlayerSession.unsupported)
+        }
         completion(Self.describe(error, item: nil))
       }
     }
@@ -395,8 +409,45 @@ final class SystemPlayerSession: NSObject {
     ) { _ in DispatchQueue.main.async(execute: completion) }
   }
 
+  /// AVPlayer can stay "loading" forever without failing, or play the audio
+  /// while it cannot decode the video. Both are reported as errors so the
+  /// Dart side falls back to mpv.
+  private func startWatchdog(_ item: AVPlayerItem) {
+    watchdog?.invalidate()
+    let started = Date()
+    var playedFrom: CMTime?
+    watchdog = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] timer in
+      guard let self, self.player.currentItem === item else { return timer.invalidate() }
+      switch item.status {
+      case .failed:
+        timer.invalidate()
+      case .unknown:
+        // Waiting for the user is not a failure; only count while playback is wanted.
+        if self.player.timeControlStatus != .paused,
+          Date().timeIntervalSince(started) > 20
+        {
+          timer.invalidate()
+          self.emit("error", ["message": "加载超时"])
+        }
+      case .readyToPlay:
+        if item.presentationSize.width > 0 { return timer.invalidate() }
+        guard self.player.timeControlStatus == .playing else { return }
+        let now = item.currentTime()
+        guard let from = playedFrom else { playedFrom = now; return }
+        if (now - from).seconds > 4 {
+          timer.invalidate()
+          self.emit("error", ["message": "无法解码视频画面"])
+        }
+      @unknown default:
+        break
+      }
+    }
+  }
+
   func dispose() {
     loadTask?.cancel()
+    watchdog?.invalidate()
+    watchdog = nil
     if let timeObserver { player.removeTimeObserver(timeObserver) }
     timeObserver = nil
     for o in itemObservers { NotificationCenter.default.removeObserver(o) }

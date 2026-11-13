@@ -757,10 +757,10 @@ class VideoDetailController extends GetxController
       if (kDebugMode) debugPrint('system player skipped: $reason ($codecs)');
     }
 
-    // AVPlayer cannot open HEVC tagged `hev1` (parameter sets in-band), which
-    // bilibili uses for most SDR HEVC streams. HDR streams are `hvc1`.
-    if (!isHdr && codecs.startsWith('hev1')) {
-      skip('hev1');
+    // Old FLV / MP4 (durl) streams: no DASH files to build a playlist from,
+    // and AVPlayer cannot play FLV. bilibili has all but retired them.
+    if (data.dash == null) {
+      skip('not DASH');
       return null;
     }
     // AVPlayer has no software AV1 decoder.
@@ -774,24 +774,19 @@ class VideoDetailController extends GetxController
       }
     }
 
+    // Anything the playlist cannot be built from, or that AVPlayer then fails
+    // to play (also a stall or missing picture, see the native watchdog),
+    // falls back to mpv at the same position.
     final video = SystemPlayerTrack.fromItem(firstVideo, videoUrl!);
-    if (video == null) {
-      skip('video has no segment index');
-      return null;
-    }
     SystemPlayerTrack? audio;
     if (audioUrl case final url? when url.isNotEmpty) {
-      // The CDN setting may have swapped the host, so match by path.
+      // The CDN setting may have swapped the host, so match by path. Without
+      // a match the native side finds the segment index itself.
       final path = Uri.tryParse(url)?.path;
       final item = data.dash?.audio?.firstWhereOrNull(
         (e) => e.playUrls.any((u) => u == url || Uri.tryParse(u)?.path == path),
       );
-      audio = item == null ? null : SystemPlayerTrack.fromItem(item, url);
-      // Video without its audio would be worse than mpv.
-      if (audio == null) {
-        skip(item == null ? 'audio not found' : 'audio has no segment index');
-        return null;
-      }
+      audio = SystemPlayerTrack.fromItem(item, url);
     }
     return SystemPlayerSource(
       video: video,
@@ -800,16 +795,29 @@ class VideoDetailController extends GetxController
     );
   }
 
-  /// Offline: downloaded HDR / Dolby Vision videos are read straight from the
-  /// files by the system player, like online ones. Other downloads, and old
-  /// single-file MP4 downloads, stay on mpv.
+  /// Offline: downloads are read straight from the files by the system
+  /// player, under the same settings as online videos.
   Future<SystemPlayerSource?> _localSystemPlayerSource() async {
-    if (entry.mediaType == 1 ||
-        !_hdrQualities.contains(entry.preferedVideoQuality) ||
-        !(Pref.systemPlayerHdr || Pref.systemPlayerAll)) {
+    final isHdr = _hdrQualities.contains(entry.preferedVideoQuality);
+    if (!(Pref.systemPlayerAll || (isHdr && Pref.systemPlayerHdr))) {
       return null;
     }
     final dir = path.join(args['dirPath'] as String, entry.typeTag!);
+    Map? index;
+    try {
+      index = jsonDecode(
+        await File(path.join(dir, 'index.json')).readAsString(),
+      );
+    } catch (_) {}
+    // Old single-file downloads: only real MP4, not FLV.
+    if (entry.mediaType == 1) {
+      final video = File(path.join(dir, PathUtils.videoNameType1));
+      if (!video.existsSync() ||
+          (index?['format'] as String?)?.contains('mp4') != true) {
+        return null;
+      }
+      return SystemPlayerSource(video: SystemPlayerTrack.file(video.path));
+    }
     final video = File(path.join(dir, PathUtils.videoNameType2));
     final audio = entry.hasDashAudio
         ? File(path.join(dir, PathUtils.audioNameType2))
@@ -818,16 +826,11 @@ class VideoDetailController extends GetxController
       return null;
     }
     // AVPlayer has no software AV1 decoder. bilibili codecid 13 is AV1.
-    try {
-      final json = jsonDecode(
-        await File(path.join(dir, 'index.json')).readAsString(),
-      );
-      if ((json['video'] as List?)?.firstOrNull?['codecid'] == 13 &&
-          !(_hwDecodeSupport['av01'] ??=
-              await SystemPlayer.supportsHardwareDecode('av01'))) {
-        return null;
-      }
-    } catch (_) {}
+    if ((index?['video'] as List?)?.firstOrNull?['codecid'] == 13 &&
+        !(_hwDecodeSupport['av01'] ??=
+            await SystemPlayer.supportsHardwareDecode('av01'))) {
+      return null;
+    }
     return SystemPlayerSource(
       video: SystemPlayerTrack.file(video.path),
       audio: audio == null ? null : SystemPlayerTrack.file(audio.path),
