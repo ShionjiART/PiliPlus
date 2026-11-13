@@ -27,6 +27,7 @@ import 'package:PiliPlus/plugin/pl_player/models/heart_beat_type.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_repeat.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
 import 'package:PiliPlus/plugin/pl_player/models/video_fit_type.dart';
+import 'package:PiliPlus/plugin/pl_player/subtitle_cues.dart';
 import 'package:PiliPlus/plugin/pl_player/system_player.dart';
 import 'package:PiliPlus/plugin/pl_player/utils/danmaku_options.dart';
 import 'package:PiliPlus/plugin/pl_player/utils/fullscreen.dart';
@@ -97,6 +98,51 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   final _bufferStream = StreamController<Duration>.broadcast(sync: true);
   Stream<Duration> get positionStream => _positionStream.stream;
   Stream<Duration> get bufferStream => _bufferStream.stream;
+
+  /// Subtitles while the system player plays (mpv shows its own).
+  final systemSubtitle = ValueNotifier<String>('');
+  List<SubtitleCue>? _systemCues;
+  Timer? _subtitleTimer;
+
+  void setSystemSubtitle(List<SubtitleCue>? cues) {
+    _systemCues = cues;
+    _updateSystemSubtitle();
+  }
+
+  /// Shows the cues at the current position. Position events come every
+  /// 200 ms, so a timer catches cue boundaries that fall in between.
+  void _updateSystemSubtitle() {
+    _subtitleTimer?.cancel();
+    _subtitleTimer = null;
+    final cues = _systemCues;
+    if (cues == null || cues.isEmpty || !usingSystemPlayer.value) {
+      systemSubtitle.value = '';
+      return;
+    }
+    final pos = currentPosition.inMilliseconds;
+    final lines = <String>[];
+    int? next;
+    for (final cue in cues) {
+      if (cue.start > pos) {
+        if (next == null || cue.start < next) next = cue.start;
+        break;
+      }
+      if (pos < cue.end) {
+        lines.add(cue.text);
+        if (next == null || cue.end < next) next = cue.end;
+      }
+    }
+    systemSubtitle.value = lines.join('\n');
+    if (next != null && _enginePlaying) {
+      final delay = ((next - pos) / max(_engineRate, 0.1)).ceil();
+      if (delay <= 250) {
+        _subtitleTimer = Timer(
+          Duration(milliseconds: delay + 1),
+          _updateSystemSubtitle,
+        );
+      }
+    }
+  }
 
   static PlPlayerController? _instance;
 
@@ -390,8 +436,10 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   }
 
   void enterPip({bool autoEnter = false}) {
-    // TODO(system player): native AVPlayerLayer PiP (next PR).
-    if (usingSystemPlayer.value) return;
+    if (usingSystemPlayer.value) {
+      IOSPipHelper.enterPlayer(_systemPlayer!.id, autoEnter: autoEnter);
+      return;
+    }
     if (videoPlayerController case NativePlayer(:final state)) {
       if (Platform.isIOS) {
         if (videoController?.id.value case final textureId?) {
@@ -991,16 +1039,31 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     );
     if (error != null) {
       if (kDebugMode) debugPrint('system player failed: $error');
-      SmartDialog.showToast('系统播放器无法播放，已改用内置播放器');
+      SmartDialog.showToast(
+        '系统播放器无法播放，已改用内置播放器\n$error',
+        displayTime: const Duration(seconds: 5),
+      );
       return false;
     }
     usingSystemPlayer.value = true;
     return true;
   }
 
+  /// The system player's current frame, decoded for the screenshot dialog.
+  Future<ui.Image?> _systemScreenshot() async {
+    final png = await _systemPlayer?.screenshot();
+    if (png == null) return null;
+    final codec = await ui.instantiateImageCodec(png);
+    final frame = await codec.getNextFrame();
+    codec.dispose();
+    return frame.image;
+  }
+
   Future<void> _closeSystemPlayer() async {
     final player = _systemPlayer;
     if (player == null) return;
+    // Its PiP window belongs to this player; mpv arms its own if needed.
+    if (Platform.isIOS) IOSPipHelper.dispose();
     usingSystemPlayer.value = false;
     _systemSource = null;
     _systemSubscriptions?.forEach((e) => e.cancel());
@@ -1015,7 +1078,10 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     if (kDebugMode) debugPrint('system player error: $error');
     final position = currentPosition;
     await _closeSystemPlayer();
-    SmartDialog.showToast('系统播放器出错，已改用内置播放器');
+    SmartDialog.showToast(
+      '系统播放器出错，已改用内置播放器\n$error',
+      displayTime: const Duration(seconds: 5),
+    );
     await _createVideoController(
       dataSource,
       position,
@@ -1336,6 +1402,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       element(position);
     }
     _positionStream.add(position);
+    if (_systemCues != null) _updateSystemSubtitle();
   }
 
   void _onDuration(Duration duration) {
@@ -1374,6 +1441,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     try {
       if (usingSystemPlayer.value) {
         await _systemPlayer!.seek(position);
+        if (_systemCues != null) _updateSystemSubtitle();
       } else {
         await _videoPlayerController?.seek(position);
       }
@@ -1896,6 +1964,8 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
 
     _removeListeners();
     _closeSystemPlayer();
+    _subtitleTimer?.cancel();
+    systemSubtitle.dispose();
     _positionStream.close();
     _bufferStream.close();
     _positionListeners.clear();
@@ -1985,14 +2055,11 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   int _screenshotState = 0;
   Future<void> takeScreenshot() async {
     if (_screenshotState > 0) return;
-    if (usingSystemPlayer.value) {
-      // TODO(system player): capture via AVPlayerItemVideoOutput.
-      SmartDialog.showToast('系统播放器暂不支持截图');
-      return;
-    }
     _screenshotState = 1;
     SmartDialog.showToast('截图中');
-    final image = await videoPlayerController?.screenshot();
+    final image = usingSystemPlayer.value
+        ? await _systemScreenshot()
+        : await videoPlayerController?.screenshot();
     if (image != null) {
       SmartDialog.showToast('点击弹窗或按 Enter 保存截图');
       await showDialog(

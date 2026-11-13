@@ -30,6 +30,22 @@ final class SystemPlayerPlugin: NSObject, FlutterPlugin, FlutterStreamHandler {
 
   static func session(_ id: Int) -> SystemPlayerSession? { shared?.sessions[id] }
 
+  /// Platform views by session id, for PiP (see PipPlugin).
+  private static var views: [Int: WeakView] = [:]
+  private final class WeakView {
+    weak var value: SystemPlayerPlatformView?
+    init(_ value: SystemPlayerPlatformView) { self.value = value }
+  }
+
+  static func register(view: SystemPlayerPlatformView, for id: Int) {
+    views = views.filter { $0.value.value != nil }
+    views[id] = WeakView(view)
+  }
+
+  static func playerLayer(for id: Int) -> AVPlayerLayer? {
+    views[id]?.value?.playerLayer
+  }
+
   func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink)
     -> FlutterError?
   {
@@ -80,6 +96,11 @@ final class SystemPlayerPlugin: NSObject, FlutterPlugin, FlutterStreamHandler {
       result(nil)
     case "info":
       result(sessions[id]?.info() ?? [:])
+    case "screenshot":
+      guard let session = sessions[id] else { return result(nil) }
+      session.screenshot { data in
+        result(data.map { FlutterStandardTypedData(bytes: $0) })
+      }
     case "dispose":
       sessions.removeValue(forKey: id)?.dispose()
       result(nil)
@@ -166,9 +187,28 @@ final class SystemPlayerSession: NSObject {
         }
         completion(nil)
       } catch {
-        completion("\(error)")
+        completion(Self.describe(error, item: nil))
       }
     }
+  }
+
+  /// Short error text shown to the user, e.g. "CoreMedia -12927 · HTTP 403".
+  static func describe(_ error: Error?, item: AVPlayerItem?) -> String {
+    var parts: [String] = []
+    func add(_ e: NSError) {
+      parts.append("\(e.domain.replacingOccurrences(of: "ErrorDomain", with: "")) \(e.code)")
+    }
+    if let e = error as NSError? {
+      add(e)
+      if let underlying = e.userInfo[NSUnderlyingErrorKey] as? NSError { add(underlying) }
+    }
+    // The access/error log has the HTTP status of failed segment requests.
+    if let event = item?.errorLog()?.events.last {
+      if event.errorStatusCode != 0 { parts.append("\(event.errorStatusCode)") }
+      if let comment = event.errorComment, !comment.isEmpty { parts.append(comment) }
+    }
+    if parts.isEmpty, let error { parts.append("\(error)") }
+    return String((parts.isEmpty ? "unknown" : parts.joined(separator: " · ")).prefix(160))
   }
 
   private static func track(_ value: Any?) -> DashTrack? {
@@ -192,7 +232,7 @@ final class SystemPlayerSession: NSObject {
             let d = item.duration
             if d.isNumeric { self.emit("duration", ["ms": Int(d.seconds * 1000)]) }
           } else if item.status == .failed {
-            self.emit("error", ["message": item.error.map { "\($0)" } ?? "failed"])
+            self.emit("error", ["message": Self.describe(item.error, item: item)])
           }
         }
       })
@@ -214,7 +254,7 @@ final class SystemPlayerSession: NSObject {
         forName: AVPlayerItem.failedToPlayToEndTimeNotification, object: item, queue: .main
       ) { [weak self] n in
         let error = n.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey]
-        self?.emit("error", ["message": error.map { "\($0)" } ?? "failed to play to end"])
+        self?.emit("error", ["message": Self.describe(error as? Error, item: item)])
       })
   }
 
@@ -239,6 +279,50 @@ final class SystemPlayerSession: NSObject {
       lastBuffering = buffering
       emit("buffering", ["value": buffering])
     }
+  }
+
+  /// The current frame as PNG. Frames are taken in the decoder's own format
+  /// (no conversion that could fail on device) and HDR is tone mapped to SDR
+  /// by Core Image, so saved screenshots look right in Photos.
+  func screenshot(completion: @escaping (Data?) -> Void) {
+    guard let item = player.currentItem else { return completion(nil) }
+    let output = AVPlayerItemVideoOutput(pixelBufferAttributes: nil)
+    item.add(output)
+    // Only attached for the screenshot; a paused player renders no new frame
+    // into a new output, so re-seek to the same time to get one.
+    let time = item.currentTime()
+    let paused = player.rate == 0
+    if paused {
+      player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
+    }
+    var attempts = 0
+    func poll() {
+      attempts += 1
+      let now = output.itemTime(forHostTime: CACurrentMediaTime())
+      let buffer =
+        output.copyPixelBuffer(forItemTime: paused ? time : now, itemTimeForDisplay: nil)
+        ?? (paused ? output.copyPixelBuffer(forItemTime: now, itemTimeForDisplay: nil) : nil)
+      if let buffer {
+        item.remove(output)
+        DispatchQueue.global(qos: .userInitiated).async {
+          let data = Self.png(from: buffer)
+          DispatchQueue.main.async { completion(data) }
+        }
+      } else if attempts < 80 {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: poll)
+      } else {
+        item.remove(output)
+        NSLog("SystemPlayer: screenshot got no frame")
+        completion(nil)
+      }
+    }
+    poll()
+  }
+
+  static func png(from buffer: CVPixelBuffer) -> Data? {
+    let image = CIImage(cvPixelBuffer: buffer, options: [.toneMapHDRtoSDR: true])
+    return CIContext().pngRepresentation(
+      of: image, format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
   }
 
   /// What the playback info panel shows while this player is in use.
@@ -335,8 +419,11 @@ final class SystemPlayerPlatformView: NSObject, FlutterPlatformView {
   private let content = SystemPlayerLayerView()
   private var observers: [NSObjectProtocol] = []
 
+  var playerLayer: AVPlayerLayer { content.playerLayer }
+
   init(sessionId: Int) {
     super.init()
+    SystemPlayerPlugin.register(view: self, for: sessionId)
     content.backgroundColor = .black
     content.isUserInteractionEnabled = false
     // Flutter sizes this view to the video's aspect ratio (FittedBox).
@@ -349,7 +436,17 @@ final class SystemPlayerPlatformView: NSObject, FlutterPlatformView {
     observers.append(
       center.addObserver(
         forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main
-      ) { [weak self] _ in self?.content.playerLayer.player = nil })
+      ) { [weak self] _ in
+        guard let self else { return }
+        // In PiP (or about to enter it automatically) the layer must keep
+        // its player, AVKit handles background playback then.
+        if #available(iOS 15.0, *),
+          PlayerLayerPipSession.engagedLayer === self.content.playerLayer
+        {
+          return
+        }
+        self.content.playerLayer.player = nil
+      })
     observers.append(
       center.addObserver(
         forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main

@@ -51,6 +51,7 @@ import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/models/data_source.dart';
 import 'package:PiliPlus/plugin/pl_player/models/heart_beat_type.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
+import 'package:PiliPlus/plugin/pl_player/subtitle_cues.dart';
 import 'package:PiliPlus/plugin/pl_player/system_player.dart';
 import 'package:PiliPlus/services/download/download_service.dart';
 import 'package:PiliPlus/utils/accounts.dart';
@@ -746,27 +747,45 @@ class VideoDetailController extends GetxController
     if (!(Pref.systemPlayerAll || (isHdr && Pref.systemPlayerHdr))) {
       return null;
     }
+    void skip(String reason) {
+      if (kDebugMode) debugPrint('system player skipped: $reason ($codecs)');
+    }
+
     // AVPlayer cannot open HEVC tagged `hev1` (parameter sets in-band), which
     // bilibili uses for most SDR HEVC streams. HDR streams are `hvc1`.
-    if (!isHdr && codecs.startsWith('hev1')) return null;
+    if (!isHdr && codecs.startsWith('hev1')) {
+      skip('hev1');
+      return null;
+    }
     // AVPlayer has no software AV1 decoder.
     final family = codecs.length >= 4 ? codecs.substring(0, 4) : codecs;
     if (family == 'av01') {
       final supported = _hwDecodeSupport[family] ??=
           await SystemPlayer.supportsHardwareDecode(family);
-      if (!supported) return null;
+      if (!supported) {
+        skip('no AV1 hardware decoder');
+        return null;
+      }
     }
 
     final video = SystemPlayerTrack.fromItem(firstVideo, videoUrl!);
-    if (video == null) return null;
+    if (video == null) {
+      skip('video has no segment index');
+      return null;
+    }
     SystemPlayerTrack? audio;
     if (audioUrl case final url? when url.isNotEmpty) {
+      // The CDN setting may have swapped the host, so match by path.
+      final path = Uri.tryParse(url)?.path;
       final item = data.dash?.audio?.firstWhereOrNull(
-        (e) => e.playUrls.contains(url),
+        (e) => e.playUrls.any((u) => u == url || Uri.tryParse(u)?.path == path),
       );
       audio = item == null ? null : SystemPlayerTrack.fromItem(item, url);
       // Video without its audio would be worse than mpv.
-      if (audio == null) return null;
+      if (audio == null) {
+        skip(item == null ? 'audio not found' : 'audio has no segment index');
+        return null;
+      }
     }
     return SystemPlayerSource(
       video: video,
@@ -1150,6 +1169,7 @@ class VideoDetailController extends GetxController
   // 设定字幕轨道
   Future<void> setSubtitle(int index) async {
     if (index <= 0) {
+      plPlayerController.setSystemSubtitle(null);
       await plPlayerController.videoPlayerController?.setSubtitleTrack(.no());
       vttSubtitlesIndex.value = index;
       return;
@@ -1190,6 +1210,30 @@ class VideoDetailController extends GetxController
       SubtitleTrack(subUri, sub.lanDoc, sub.lan, uri: true),
     );
     vttSubtitlesIndex.value = index;
+    if (SystemPlayer.isSupported) await _setSystemSub(subtitle);
+  }
+
+  /// The iOS system player shows subtitles in Flutter, so it needs the cues.
+  /// Kept up to date even while mpv plays, for a later switch of engine.
+  Future<void> _setSystemSub(SubtitleData subtitle) async {
+    try {
+      final content = subtitle.isData
+          ? subtitle.id
+          : await File(subtitle.id).readAsString();
+      final cues = await compute(
+        (String text) => SubtitleCueParser.parse(
+          text,
+          fileName: subtitle.isData ? null : subtitle.id,
+        ),
+        content,
+      );
+      if (!isClosed) plPlayerController.setSystemSubtitle(cues);
+    } catch (e) {
+      if (kDebugMode) debugPrint('system player subtitle: $e');
+      if (plPlayerController.usingSystemPlayer.value) {
+        SmartDialog.showToast('系统播放器无法读取该字幕');
+      }
+    }
   }
 
   // interactive video
