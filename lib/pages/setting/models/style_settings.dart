@@ -218,7 +218,7 @@ List<SettingsModel> get styleSettings => [
     subtitle: '关闭会显示为单列',
     leading: const Icon(Icons.view_array_outlined),
     setKey: SettingBoxKey.dynamicsWaterfallFlow,
-    defaultVal: Pref.horizontalScreen,
+    defaultVal: Pref.dynamicsWaterfallFlowDefault,
     needReboot: true,
   ),
   PopupModel(
