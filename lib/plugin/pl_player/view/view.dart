@@ -49,6 +49,7 @@ import 'package:PiliPlus/plugin/pl_player/widgets/common_btn.dart';
 import 'package:PiliPlus/plugin/pl_player/widgets/forward_seek.dart';
 import 'package:PiliPlus/plugin/pl_player/widgets/mpv_convert_webp.dart';
 import 'package:PiliPlus/plugin/pl_player/widgets/play_pause_btn.dart';
+import 'package:PiliPlus/plugin/pl_player/widgets/system_player_video.dart';
 import 'package:PiliPlus/utils/android/bindings.g.dart';
 import 'package:PiliPlus/utils/cache_manager.dart';
 import 'package:PiliPlus/utils/connectivity_utils.dart';
@@ -338,8 +339,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
     if (Platform.isIOS && IOSPipHelper.isActive) return;
     if (!plPlayerController.continuePlayInBackground.value) {
       if (const <AppLifecycleState>[.paused, .detached].contains(state)) {
-        final player = plPlayerController.videoPlayerController;
-        if (player != null && player.state.playing) {
+        if (plPlayerController.playerStatus.isPlaying) {
           _pauseDueToPauseUponEnteringBackgroundMode = true;
           plPlayerController.pause();
         }
@@ -958,8 +958,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
         ..seekToPos = null;
     } else {
       plPlayerController.position.value =
-          plPlayerController.videoPlayerController?.state.position.inSeconds ??
-          0;
+          plPlayerController.currentPosition.inSeconds;
     }
     plPlayerController.onSeekEnd();
   }
@@ -1346,12 +1345,17 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
             child: IgnorePointer(
               ignoring: !plPlayerController.enableDragSubtitle,
               child: Obx(
-                () => SubtitleView(
-                  controller: videoController,
-                  configuration: plPlayerController.subtitleConfig.value,
-                  enableDragSubtitle: plPlayerController.enableDragSubtitle,
-                  onUpdatePadding: plPlayerController.onUpdatePadding,
-                ),
+                // TODO(system player): subtitles (AVPlayer does not feed
+                // media_kit's subtitle stream).
+                () => plPlayerController.usingSystemPlayer.value
+                    ? const SizedBox.shrink()
+                    : SubtitleView(
+                        controller: videoController,
+                        configuration: plPlayerController.subtitleConfig.value,
+                        enableDragSubtitle:
+                            plPlayerController.enableDragSubtitle,
+                        onUpdatePadding: plPlayerController.onUpdatePadding,
+                      ),
               ),
             ),
           ),
@@ -2028,11 +2032,18 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
                   child: FittedBox(
                     fit: videoFit.boxFit,
                     alignment: widget.alignment,
-                    child: SimpleVideo(
-                      controller: plPlayerController.videoController!,
-                      fill: widget.fill,
-                      aspectRatio: videoFit.aspectRatio,
-                    ),
+                    child: plPlayerController.usingSystemPlayer.value
+                        ? SystemPlayerVideo(
+                            player: plPlayerController.systemPlayer!,
+                            width: plPlayerController.width,
+                            height: plPlayerController.height,
+                            aspectRatio: videoFit.aspectRatio,
+                          )
+                        : SimpleVideo(
+                            controller: plPlayerController.videoController!,
+                            fill: widget.fill,
+                            aspectRatio: videoFit.aspectRatio,
+                          ),
                   ),
                 );
               },

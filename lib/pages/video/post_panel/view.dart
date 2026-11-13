@@ -516,41 +516,40 @@ class _PostPanelState extends State<PostPanel>
             tooltip: '预览',
             icon: const Icon(Icons.preview_outlined),
             onPressed: () async {
-              final player = plPlayerController.videoPlayerController;
-              if (player != null) {
+              if (plPlayerController.videoPlayerController != null) {
                 final start = (item.segment.first * 1000).round();
                 Future<void> seekTo() => plPlayerController.seekTo(
                   Duration(milliseconds: (item.segment.second * 1000).round()),
                 );
                 if (start <= 0) {
                   seekTo();
-                  if (!player.state.playing) {
+                  if (!plPlayerController.playerStatus.isPlaying) {
                     await plPlayerController.play();
                   }
                   return;
                 }
                 final seek = max(0, start - 2000);
                 await plPlayerController.seekTo(Duration(milliseconds: seek));
-                if (!player.state.playing) {
+                if (!plPlayerController.playerStatus.isPlaying) {
                   await plPlayerController.play();
                 }
                 if (start > seek) {
-                  final posSub = player.stream.position.listen(
-                    null,
-                    cancelOnError: true,
-                  );
-                  final timer = Timer(
-                    const Duration(seconds: 10),
-                    posSub.cancel,
-                  );
+                  // Works for both mpv and the iOS system player.
                   final duration = Duration(milliseconds: start);
-                  posSub.onData((pos) {
+                  late final Timer timer;
+                  void onPosition(Duration pos) {
                     if (pos >= duration) {
                       seekTo();
                       timer.cancel();
-                      posSub.cancel();
+                      plPlayerController.removePositionListener(onPosition);
                     }
-                  });
+                  }
+
+                  plPlayerController.addPositionListener(onPosition);
+                  timer = Timer(
+                    const Duration(seconds: 10),
+                    () => plPlayerController.removePositionListener(onPosition),
+                  );
                 } else {
                   seekTo();
                 }

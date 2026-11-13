@@ -51,6 +51,7 @@ import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/models/data_source.dart';
 import 'package:PiliPlus/plugin/pl_player/models/heart_beat_type.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
+import 'package:PiliPlus/plugin/pl_player/system_player.dart';
 import 'package:PiliPlus/services/download/download_service.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/connectivity_utils.dart';
@@ -574,6 +575,12 @@ class VideoDetailController extends GetxController
   BlockConfigMixin get blockConfig => plPlayerController;
   @override
   Player? get player => plPlayerController.videoPlayerController;
+
+  @override
+  Stream<Duration> get positionStream => plPlayerController.positionStream;
+
+  @override
+  Stream<Duration> get bufferStream => plPlayerController.bufferStream;
   @override
   bool get isFullScreen => plPlayerController.isFullScreen.value;
   @override
@@ -716,12 +723,64 @@ class VideoDetailController extends GetxController
     return bestVideo ?? videoList.first;
   }
 
+  static final Map<String, bool> _hwDecodeSupport = {};
+
+  /// iOS: play with the system player (AVPlayer) instead of mpv when the
+  /// settings ask for it. mpv only outputs SDR on iOS, so HDR / Dolby Vision
+  /// look wrong there. Returns null to keep mpv.
+  Future<SystemPlayerSource?> _systemPlayerSource() async {
+    if (!SystemPlayer.isSupported ||
+        isFileSource ||
+        plPlayerController.onlyPlayAudio.value) {
+      return null;
+    }
+    final codecs = firstVideo.codecs ?? '';
+    final isHdr =
+        const {
+          125, // HDR 真彩
+          126, // 杜比视界
+          129, // HDR Vivid
+        }.contains(firstVideo.quality.code) ||
+        codecs.startsWith('dvh1') ||
+        codecs.startsWith('dvhe');
+    if (!(Pref.systemPlayerAll || (isHdr && Pref.systemPlayerHdr))) {
+      return null;
+    }
+    // AVPlayer cannot open HEVC tagged `hev1` (parameter sets in-band), which
+    // bilibili uses for most SDR HEVC streams. HDR streams are `hvc1`.
+    if (!isHdr && codecs.startsWith('hev1')) return null;
+    // AVPlayer has no software AV1 decoder.
+    final family = codecs.length >= 4 ? codecs.substring(0, 4) : codecs;
+    if (family == 'av01') {
+      final supported = _hwDecodeSupport[family] ??=
+          await SystemPlayer.supportsHardwareDecode(family);
+      if (!supported) return null;
+    }
+
+    final video = SystemPlayerTrack.fromItem(firstVideo, videoUrl!);
+    if (video == null) return null;
+    SystemPlayerTrack? audio;
+    if (audioUrl case final url? when url.isNotEmpty) {
+      final item = data.dash?.audio?.firstWhereOrNull(
+        (e) => e.playUrls.contains(url),
+      );
+      audio = item == null ? null : SystemPlayerTrack.fromItem(item, url);
+      // Video without its audio would be worse than mpv.
+      if (audio == null) return null;
+    }
+    return SystemPlayerSource(
+      video: video,
+      audio: audio,
+      frameRate: double.tryParse(firstVideo.frameRate ?? ''),
+    );
+  }
+
   /// 更新画质、音质
   void updatePlayer() {
     final currentVideoQa = this.currentVideoQa.value;
     if (currentVideoQa == null) return;
     _autoPlay.value = true;
-    playedTime = plPlayerController.videoPlayerController?.state.position;
+    playedTime = plPlayerController.currentPosition;
     plPlayerController
       ..isBuffering.value = false
       ..buffered.value = 0;
@@ -795,6 +854,7 @@ class VideoDetailController extends GetxController
       volume: volume,
       autoFullScreenFlag: autoFullScreenFlag,
       rotate: _rotate,
+      systemSource: await _systemPlayerSource(),
     );
 
     if (isClosed) return;
