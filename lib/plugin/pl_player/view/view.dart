@@ -1603,7 +1603,12 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
                   AppBarAni(
                     isTop: false,
                     controller: _animationController,
-                    removeSafeArea: plPlayerController.removeSafeArea,
+                    // BottomControl keeps only its buttons clear of the side
+                    // insets, so its progress bar can reach past iPhone Duo's
+                    // camera, which sits at the top of the vertical status bar.
+                    removeSafeArea:
+                        plPlayerController.removeSafeArea ||
+                        widget.bottomControl == null,
                     child:
                         widget.bottomControl ??
                         BottomControl(
@@ -1611,6 +1616,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
                           isFullScreen: isFullScreen,
                           animCtr: _animationController,
                           controller: plPlayerController,
+                          removeSafeArea: plPlayerController.removeSafeArea,
                           videoDetailController: videoDetailController,
                           buildBottomControl: () => buildBottomControl(
                             videoDetailController,
@@ -1692,14 +1698,10 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
         if (!isLive)
           Positioned(
             bottom: -2.2,
-            // 和底部控制条一样避开左右安全区（iPhone Duo 合上时摄像头在
-            // 竖状态栏里，竖状态栏隐藏后安全区仍在）
-            left: plPlayerController.removeSafeArea
-                ? 0
-                : MediaQuery.viewPaddingOf(context).left,
-            right: plPlayerController.removeSafeArea
-                ? 0
-                : MediaQuery.viewPaddingOf(context).right,
+            // 和控件显示时的进度条一样铺满左右安全区：iPhone Duo 合上时
+            // 摄像头只在竖状态栏顶部，底部这一段不会被挡住
+            left: 0,
+            right: 0,
             child: Obx(
               () {
                 final showControls = plPlayerController.showControls.value;
