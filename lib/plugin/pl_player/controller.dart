@@ -783,6 +783,10 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   bool _processing = false;
   bool get processing => _processing;
 
+  /// 每次 [setDataSource] 加一。较早的调用被较新的取代后（例如快速切换视频），
+  /// 不再去改播放器状态，以免旧视频盖掉新视频。
+  int _sourceGen = 0;
+
   // offline
   bool get isFileSource => dataSource is FileSource;
 
@@ -814,6 +818,8 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     int? rotate,
     SystemPlayerSource? systemSource,
   }) async {
+    final gen = ++_sourceGen;
+    bool isStale() => gen != _sourceGen;
     try {
       _processing = true;
       this.isLive = isLive;
@@ -841,7 +847,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
         await pause(notify: false);
       }
 
-      if (_playerCount == 0) {
+      if (_playerCount == 0 || isStale()) {
         return;
       }
       _lastVolume = volume;
@@ -850,7 +856,13 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       if (systemSource == null ||
           !await _openSystemPlayer(systemSource, seekTo)) {
         await _closeSystemPlayer();
-        await _createVideoController(dataSource, seekTo, volume, rotate);
+        await _createVideoController(
+          dataSource,
+          seekTo,
+          volume,
+          rotate,
+          isStale: isStale,
+        );
       }
 
       if (_playerCount == 0) {
@@ -861,6 +873,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
         _videoController = null;
         return;
       }
+      if (isStale()) return;
 
       updateDuration(
         duration ??
@@ -877,15 +890,17 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       }
 
       await _initializePlayer();
+      if (isStale()) return;
       onInit?.call();
     } catch (err, stackTrace) {
+      if (isStale()) return;
       dataStatus.value = DataStatus.error;
       if (kDebugMode) {
         debugPrint(stackTrace.toString());
         debugPrint('plPlayer err:  $err');
       }
     } finally {
-      _processing = false;
+      if (!isStale()) _processing = false;
     }
   }
 
@@ -988,9 +1003,22 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     return player;
   }
 
+  Future<Player?>? _creatingPlayer;
+
   /// Creates the mpv player on first use. Returns null if the page went away.
-  Future<Player?> _ensurePlayer() async {
-    var player = _videoPlayerController;
+  /// Concurrent callers share one creation, otherwise each would create its own
+  /// mpv player and the view could show the texture of one while another plays.
+  Future<Player?> _ensurePlayer() {
+    if (_videoPlayerController case final player?) {
+      return Future.value(player);
+    }
+    return _creatingPlayer ??= _createPlayer().whenComplete(
+      () => _creatingPlayer = null,
+    );
+  }
+
+  Future<Player?> _createPlayer() async {
+    Player? player = _videoPlayerController;
     if (player == null) {
       player = await _initPlayer();
       if (_playerCount == 0) {
@@ -1111,14 +1139,15 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     DataSource dataSource,
     Duration? seekTo,
     Volume? volume,
-    int? rotate,
-  ) async {
+    int? rotate, {
+    bool Function()? isStale,
+  }) async {
     isBuffering.value = false;
     _heartDuration = 0;
     danmakuController?.clear();
 
     final player = await _ensurePlayer();
-    if (player == null) return;
+    if (player == null || (isStale?.call() ?? false)) return;
 
     final Map<String, String> extras = {
       if (dataSource is FileSource)
