@@ -117,7 +117,9 @@ final class NativeTabBarController: UITabBarController, UITabBarControllerDelega
       result(nil)
     case "setHidesVerticalBar":
       hidesVerticalBar = call.arguments as? Bool ?? false
-      result(nil)
+      // Reply with the actual state so Dart can correct itself if it missed a
+      // `verticalBarHidden` notification.
+      result(isVerticalBarHidden)
     default:
       result(FlutterMethodNotImplemented)
     }

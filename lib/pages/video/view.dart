@@ -192,6 +192,8 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     final isResume = state == .resumed;
     final ctr = videoDetailController.plPlayerController..visible = isResume;
     if (isResume) {
+      // 回到前台时重新确认竖状态栏已隐藏
+      if (_isOnTop) _updateVerticalBar();
       if (!ctr.showDanmaku) {
         introController.startTimer();
         ctr.showDanmaku = true;
