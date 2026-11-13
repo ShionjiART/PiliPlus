@@ -61,10 +61,15 @@ abstract final class IOSNativeTabBar {
           await onToolAction?.call(call.arguments as String);
         case 'toolsShown':
           toolsShown.value = call.arguments as bool;
+        case 'backAvailable':
+          backAvailable.value = call.arguments as bool;
       }
     });
     try {
       _setSafeArea(await _channel.invokeMethod('getSafeArea'));
+      // 原生层在 Flutter 准备好之前可能已经发过通知
+      backAvailable.value =
+          await _channel.invokeMethod<bool>('getBackAvailable') ?? false;
     } on MissingPluginException {
       // 没有原生标签栏容器
     }
@@ -168,13 +173,32 @@ abstract final class IOSNativeTabBar {
   // ---------------------------------------------------------------------------
   // 竖状态栏里的页面按钮（iPhone Duo）：二级页面的返回键，以及页面自己注册的按钮。
   // 原生层只在有竖状态栏、且它没被隐藏时显示这些按钮；其他设备上不显示。
-  // 页面里原有的返回键等不受影响。
+  // 有竖状态栏时，页面左上角由 AppBar 自动加的返回键去掉（见 [backAvailable]）。
 
   /// 点击竖状态栏里的返回键
   static Future<void> Function()? onBack;
 
   /// 竖状态栏里当前是否显示返回键（由原生层告知）
   static final backButtonVisible = ValueNotifier(false);
+
+  /// 二级页面的返回键是否在竖状态栏里（由原生层告知）：有竖状态栏时为 true，
+  /// 开合时变化。只看有没有竖状态栏，不看视频页是否把它隐藏，免得视频页下面
+  /// 的页面在进出视频页时跟着变布局；视频页用的是自己的返回键
+  static final backAvailable = ValueNotifier(false);
+
+  /// [context] 所在页面左上角的返回键是否由竖状态栏里的返回键代替。弹窗等
+  /// 不是页面的路由不算，竖状态栏的返回键不对应它们。
+  ///
+  /// 在 build 中调用，依赖 [NativeBackScope]，开合时会重建
+  static bool hidesPageBackButton(BuildContext context) {
+    final available =
+        context
+            .dependOnInheritedWidgetOfExactType<NativeBackScope>()
+            ?.notifier
+            ?.value ??
+        false;
+    return available && ModalRoute.of(context) is PageRoute;
+  }
 
   /// 竖状态栏里当前是否显示页面按钮（由原生层告知）
   static final pageActionsVisible = ValueNotifier(false);
@@ -248,4 +272,11 @@ class NativeSafeArea extends StatelessWidget {
       child: child,
     );
   }
+}
+
+/// 把 [IOSNativeTabBar.backAvailable] 提供给页面，让依赖它的返回键在开合时
+/// 重建，见 [IOSNativeTabBar.hidesPageBackButton]
+class NativeBackScope extends InheritedNotifier<ValueNotifier<bool>> {
+  NativeBackScope({super.key, required super.child})
+    : super(notifier: IOSNativeTabBar.backAvailable);
 }

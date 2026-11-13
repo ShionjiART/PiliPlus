@@ -8,6 +8,7 @@ import 'package:PiliPlus/common/widgets/main_layout.dart';
 import 'package:PiliPlus/common/widgets/route_aware_mixin.dart';
 import 'package:PiliPlus/models/common/nav_bar_config.dart';
 import 'package:PiliPlus/pages/home/view.dart';
+import 'package:PiliPlus/pages/login/controller.dart';
 import 'package:PiliPlus/pages/main/controller.dart';
 import 'package:PiliPlus/utils/android/bindings.g.dart';
 import 'package:PiliPlus/utils/app_scheme.dart';
@@ -136,8 +137,12 @@ class _MainAppState extends PopScopeState<MainApp>
           ..lastCheckUnreadAt = DateTime.now().millisecondsSinceEpoch;
         Get.toNamed('/whisper');
       case 'mine':
-        // 和首页顶部的头像一样：已登录去「我的」，未登录去登录
-        _mainController.toMinePage();
+        // 已登录时弹出账号切换；未登录时去「我的」页面登录
+        if (_mainController.accountService.isLogin.value) {
+          await LoginPageController.switchAccountDialog(context);
+        } else {
+          _mainController.toMinePage();
+        }
     }
   }
 

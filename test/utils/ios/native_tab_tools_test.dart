@@ -20,6 +20,7 @@ void main() {
     expect(list.map((e) => e.id), ['mine', 'search', 'notifications']);
     expect(list.map((e) => e.group), ['account', 'actions', 'actions']);
     expect(list.last.symbol, 'envelope');
+    expect(list.first.title, '切换账号', reason: '已登录时点头像弹出账号切换');
   });
 
   test('未登录时没有私信，头像是人形图标，点了去登录', () {
