@@ -22,6 +22,7 @@ import 'package:PiliPlus/utils/bili_utils.dart';
 import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:PiliPlus/utils/extension/num_ext.dart';
 import 'package:PiliPlus/utils/extension/theme_ext.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:flutter_svg/svg.dart';
@@ -151,7 +152,8 @@ class _MediaPageState extends CommonPageState<MinePage>
     const padding = EdgeInsets.all(8);
     const style = ButtonStyle(tapTargetSize: .shrinkWrap);
     return PlayerBar(
-      left: widget.showBackBtn
+      // iPhone Duo 竖状态栏里有返回键时不再重复显示
+      left: widget.showBackBtn && !IOSNativeTabBar.hidesPageBackButton(context)
           ? const Padding(
               padding: EdgeInsets.only(left: 8),
               child: BackButton(),
