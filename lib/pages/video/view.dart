@@ -708,6 +708,9 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       child: Container(
         color: colorScheme.surface,
         alignment: .topCenter,
+        // 背景铺满，按钮避开左右安全区（iPhone Duo 合上时摄像头在竖状态栏里，
+        // 竖状态栏隐藏后安全区仍在），和播放器控件一样
+        padding: EdgeInsets.only(left: padding.left, right: padding.right),
         child: SizedBox(
           height: kToolbarHeight,
           child: Stack(
