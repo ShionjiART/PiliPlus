@@ -60,6 +60,7 @@ class SplitModel extends SettingsModel {
     onChanged: switchModel.onChanged,
     confirmChange: switchModel.confirmChange,
     lockedOnBy: switchModel.lockedOnBy,
+    lockedOffReason: switchModel.lockedOffReason,
     needReboot: switchModel.needReboot,
     leading: normalModel.leading,
     onTap: switchModel.onTap,
@@ -166,6 +167,7 @@ class SwitchModel extends SettingsModel {
   final ValueChanged<bool>? onChanged;
   final Future<bool> Function(BuildContext context, bool value)? confirmChange;
   final String? lockedOnBy;
+  final String? lockedOffReason;
   final bool needReboot;
   final void Function(BuildContext context)? onTap;
 
@@ -180,6 +182,7 @@ class SwitchModel extends SettingsModel {
     this.onChanged,
     this.confirmChange,
     this.lockedOnBy,
+    this.lockedOffReason,
     this.needReboot = false,
     this.onTap,
   });
@@ -191,6 +194,7 @@ class SwitchModel extends SettingsModel {
     this.onChanged,
     this.confirmChange,
     this.lockedOnBy,
+    this.lockedOffReason,
     this.onTap,
   }) : title = null;
 
@@ -208,6 +212,7 @@ class SwitchModel extends SettingsModel {
     onChanged: onChanged,
     confirmChange: confirmChange,
     lockedOnBy: lockedOnBy,
+    lockedOffReason: lockedOffReason,
     needReboot: needReboot,
     leading: leading,
     onTap: onTap,
