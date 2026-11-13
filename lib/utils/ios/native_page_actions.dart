@@ -7,7 +7,9 @@ class NativePageAction {
     required this.title,
     this.count,
     this.selected = false,
+    this.selectedColor,
     this.enabled = true,
+    this.standalone = false,
   });
 
   final String id;
@@ -16,14 +18,23 @@ class NativePageAction {
   /// Short text shown under the icon, such as a like count.
   final String? count;
   final bool selected;
+
+  /// ARGB color of a selected button, such as the app's theme color for a
+  /// like; the system tint when null.
+  final int? selectedColor;
   final bool enabled;
+
+  /// Shown as its own button rather than grouped with its neighbours.
+  final bool standalone;
 
   Map<String, Object> toMap() => {
     'id': id,
     'title': title,
     'count': ?count,
     'selected': selected,
+    'selectedColor': ?selectedColor,
     'enabled': enabled,
+    if (standalone) 'standalone': true,
   };
 }
 

@@ -34,7 +34,10 @@ import 'package:PiliPlus/pages/dynamics_create/view.dart';
 import 'package:PiliPlus/pages/dynamics_detail/controller.dart';
 import 'package:PiliPlus/pages/dynamics_repost/view.dart';
 import 'package:PiliPlus/utils/extension/get_ext.dart';
+import 'package:PiliPlus/utils/feed_back.dart';
 import 'package:PiliPlus/utils/grid.dart';
+import 'package:PiliPlus/utils/ios/native_page_actions.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:PiliPlus/utils/num_utils.dart';
 import 'package:PiliPlus/utils/reply_scheme_helper.dart';
 import 'package:PiliPlus/utils/request_utils.dart';
@@ -102,8 +105,148 @@ class _DynamicDetailPageState extends CommonDynPageMultiState<DynamicDetailPage>
   @override
   void dispose() {
     _scrollable = null;
+    if (_nativeRoute case final route?) {
+      IOSNativeTabBar.removePageActions(route);
+    }
+    _statVersion.dispose();
     super.dispose();
   }
+
+  // iPhone Duo：底部操作栏的转发、分享、评论、点赞也放进竖状态栏。两边共用
+  // 下面的方法，任何一边操作后，两边的数字一起更新
+
+  ModalRoute<dynamic>? _nativeRoute;
+  bool _nativeUpdateScheduled = false;
+
+  /// 转发数、点赞状态变了，底部操作栏据此重建
+  final _statVersion = ValueNotifier(0);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != _nativeRoute) {
+      if (_nativeRoute case final previous?) {
+        IOSNativeTabBar.removePageActions(previous);
+      }
+      _nativeRoute = route;
+      _scheduleNativeActions();
+    }
+  }
+
+  void _onStatChanged() {
+    if (!mounted) return;
+    _statVersion.value++;
+    _scheduleNativeActions();
+  }
+
+  void _scheduleNativeActions() {
+    if (!IOSNativeTabBar.isAvailable || _nativeUpdateScheduled) return;
+    _nativeUpdateScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _nativeUpdateScheduled = false;
+      if (mounted) _publishNativeActions();
+    });
+  }
+
+  void _publishNativeActions() {
+    final route = _nativeRoute;
+    if (route == null) return;
+    final stat = controller.dynItem.modules.moduleStat;
+    // 和底部操作栏一样：有数量时显示数量，没有时显示文字
+    String caption(DynamicStat? stat, String text) =>
+        stat?.count == null ? text : NumUtils.compactCount(stat!.count!);
+    final forward = stat?.forward?.count;
+    IOSNativeTabBar.setPageActions(
+      route: route,
+      // 从上到下：点赞、评论、分享、转发，最下面单独一个发评论（代替页面上的
+      // 绿色悬浮按钮）。设置里关掉了动态操作栏时只放发评论
+      actions: [
+        if (controller.showDynActionBar) ...[
+          NativePageAction(
+            id: 'like',
+            title: '点赞',
+            count: caption(stat?.like, '点赞'),
+            selected: stat?.like?.status ?? false,
+            selectedColor: theme.colorScheme.primary.toARGB32(),
+          ),
+          NativePageAction(
+            id: 'comment',
+            title: '评论',
+            count: caption(stat?.comment, '评论'),
+          ),
+          const NativePageAction(id: 'share', title: '分享', count: '分享'),
+          // 转发只显示数量，不写「转发」两个字
+          NativePageAction(
+            id: 'repost',
+            title: '转发',
+            count: forward == null ? null : NumUtils.compactCount(forward),
+          ),
+        ],
+        const NativePageAction(id: 'reply', title: '发评论', standalone: true),
+      ],
+      onAction: _onNativeAction,
+    );
+  }
+
+  void _reply() {
+    try {
+      feedBack();
+      controller.onReply(
+        null,
+        oid: controller.oid,
+        replyType: controller.replyType,
+        mentionItem: controller.mentionItem,
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _onNativeAction(String id) async {
+    if (!mounted || !(_nativeRoute?.isCurrent ?? false)) return;
+    switch (id) {
+      case 'repost':
+        _repost();
+      case 'share':
+        _share();
+      case 'comment':
+        _jumpToComment();
+      case 'like':
+        await _like();
+      case 'reply':
+        _reply();
+    }
+  }
+
+  void _repost() {
+    final dynItem = controller.dynItem;
+    final forward = dynItem.modules.moduleStat?.forward;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => RepostPanel(
+        item: dynItem,
+        onSuccess: () {
+          if (forward != null) {
+            forward.count = (forward.count ?? 0) + 1;
+            _onStatChanged();
+          }
+        },
+        replyInfo: (oid: controller.oid, replyType: controller.replyType),
+        mentionItem: dynItem.modules.moduleAuthor?.mentionItem,
+      ),
+    );
+  }
+
+  void _share() => ShareUtils.shareText(
+    '${HttpString.opusBaseUrl}/${controller.dynItem.idStr}',
+  );
+
+  Future<void> _like() => RequestUtils.onLikeDynamic(
+    controller.dynItem,
+    controller.dynItem.modules.moduleStat?.like?.status ?? false,
+    _onStatChanged,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -486,9 +629,17 @@ class _DynamicDetailPageState extends CommonDynPageMultiState<DynamicDetailPage>
     return fabAnimWrapper(child: child);
   }
 
+  /// iPhone Duo：发评论放进了竖状态栏，页面上的悬浮按钮这时不显示
+  Widget _unlessInRail(Widget child) => ValueListenableBuilder(
+    valueListenable: IOSNativeTabBar.pageActionsVisible,
+    builder: (context, inRail, child) =>
+        inRail ? const SizedBox.shrink() : child!,
+    child: child,
+  );
+
   Widget _buildBottom() {
     if (!controller.showDynActionBar) {
-      return fabButton;
+      return _unlessInRail(fabButton);
     }
 
     final primary = theme.colorScheme.primary;
@@ -533,12 +684,14 @@ class _DynamicDetailPageState extends CommonDynPageMultiState<DynamicDetailPage>
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(
-              right: kFloatingActionButtonMargin,
-              bottom: kFloatingActionButtonMargin,
+          _unlessInRail(
+            Padding(
+              padding: const EdgeInsets.only(
+                right: kFloatingActionButtonMargin,
+                bottom: kFloatingActionButtonMargin,
+              ),
+              child: replyButton,
             ),
-            child: replyButton,
           ),
           Container(
             decoration: BoxDecoration(
@@ -550,83 +703,46 @@ class _DynamicDetailPageState extends CommonDynPageMultiState<DynamicDetailPage>
               ),
             ),
             padding: EdgeInsets.only(bottom: padding.bottom),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Builder(
-                    builder: (btnContext) {
-                      final forward = moduleStat?.forward;
-                      return textIconButton(
-                        icon: FontAwesomeIcons.shareFromSquare,
-                        text: '转发',
-                        stat: forward,
-                        onPressed: (_) => showModalBottomSheet(
-                          context: context,
-                          isScrollControlled: true,
-                          useSafeArea: true,
-                          builder: (context) => RepostPanel(
-                            item: dynItem,
-                            onSuccess: () {
-                              if (forward != null) {
-                                int count = forward.count ?? 0;
-                                forward.count = count + 1;
-                                if (btnContext.mounted) {
-                                  (btnContext as Element).markNeedsBuild();
-                                }
-                              }
-                            },
-                            replyInfo: (
-                              oid: controller.oid,
-                              replyType: controller.replyType,
-                            ),
-                            mentionItem:
-                                dynItem.modules.moduleAuthor?.mentionItem,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                Expanded(
-                  child: textIconButton(
-                    icon: CustomIcons.share_node,
-                    text: '分享',
-                    stat: null,
-                    onPressed: (_) => ShareUtils.shareText(
-                      '${HttpString.opusBaseUrl}/${controller.dynItem.idStr}',
+            // 竖状态栏里点了转发或点赞，这里也要更新
+            child: ValueListenableBuilder(
+              valueListenable: _statVersion,
+              builder: (context, _, _) => Row(
+                children: [
+                  Expanded(
+                    child: textIconButton(
+                      icon: FontAwesomeIcons.shareFromSquare,
+                      text: '转发',
+                      stat: moduleStat?.forward,
+                      onPressed: (_) => _repost(),
                     ),
                   ),
-                ),
-                Expanded(
-                  child: textIconButton(
-                    icon: FontAwesomeIcons.comment,
-                    text: '评论',
-                    stat: moduleStat?.comment,
-                    onPressed: _jumpToComment,
+                  Expanded(
+                    child: textIconButton(
+                      icon: CustomIcons.share_node,
+                      text: '分享',
+                      stat: null,
+                      onPressed: (_) => _share(),
+                    ),
                   ),
-                ),
-                Expanded(
-                  child: Builder(
-                    builder: (context) {
-                      return textIconButton(
-                        icon: FontAwesomeIcons.thumbsUp,
-                        activatedIcon: FontAwesomeIcons.solidThumbsUp,
-                        text: '点赞',
-                        stat: moduleStat?.like,
-                        onPressed: (iconColor) => RequestUtils.onLikeDynamic(
-                          dynItem,
-                          iconColor == primary,
-                          () {
-                            if (context.mounted) {
-                              (context as Element).markNeedsBuild();
-                            }
-                          },
-                        ),
-                      );
-                    },
+                  Expanded(
+                    child: textIconButton(
+                      icon: FontAwesomeIcons.comment,
+                      text: '评论',
+                      stat: moduleStat?.comment,
+                      onPressed: _jumpToComment,
+                    ),
                   ),
-                ),
-              ],
+                  Expanded(
+                    child: textIconButton(
+                      icon: FontAwesomeIcons.thumbsUp,
+                      activatedIcon: FontAwesomeIcons.solidThumbsUp,
+                      text: '点赞',
+                      stat: moduleStat?.like,
+                      onPressed: (_) => _like(),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
