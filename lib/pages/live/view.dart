@@ -22,6 +22,7 @@ import 'package:PiliPlus/utils/grid.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/theme_utils.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:get/get.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:material_ui/material_ui.dart';
@@ -176,7 +177,7 @@ class _LivePageState extends State<LivePage>
             context: context,
             tooltip: '全部标签',
             icon: const Icon(Icons.widgets),
-            onPressed: () => Get.to(const LiveAreaPage()),
+            onPressed: () => Get.toSafe(const LiveAreaPage()),
           ),
         ],
       ),
@@ -305,7 +306,7 @@ class _LivePageState extends State<LivePage>
             ),
           ),
           moreTextButton(
-            onTap: () => Get.to(const LiveFollowPage()),
+            onTap: () => Get.toSafe(const LiveFollowPage()),
             color: colorScheme.outline,
           ),
         ],
@@ -337,7 +338,7 @@ class _LivePageState extends State<LivePage>
                 return Align(
                   alignment: const Alignment(0, -0.3),
                   child: GestureDetector(
-                    onTap: () => Get.to(const LiveFollowPage()),
+                    onTap: () => Get.toSafe(const LiveFollowPage()),
                     child: Container(
                       width: 40,
                       height: 40,

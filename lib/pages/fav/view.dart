@@ -9,6 +9,7 @@ import 'package:PiliPlus/pages/fav/topic/controller.dart';
 import 'package:PiliPlus/pages/fav/video/controller.dart';
 import 'package:PiliPlus/pages/fav_folder_sort/view.dart';
 import 'package:PiliPlus/utils/extension/scroll_controller_ext.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
@@ -87,7 +88,7 @@ class _FavPageState extends State<FavPage> with SingleTickerProviderStateMixin {
                           SmartDialog.showToast('加载全部收藏夹再排序');
                           return;
                         }
-                        Get.to(
+                        Get.toSafe(
                           FavFolderSortPage(favController: _favController),
                         );
                       }

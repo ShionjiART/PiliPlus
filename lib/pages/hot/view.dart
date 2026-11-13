@@ -12,6 +12,7 @@ import 'package:PiliPlus/pages/hot/controller.dart';
 import 'package:PiliPlus/pages/rank/view.dart';
 import 'package:PiliPlus/utils/grid.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -85,7 +86,7 @@ class _HotPageState extends State<HotPage>
                           if (index != -1) {
                             homeController.tabController.animateTo(index);
                           } else {
-                            Get.to(
+                            Get.toSafe(
                               SimpleScaffold(
                                 appBar: AppBar(title: const Text('排行榜')),
                                 body: const ViewSafeArea(child: RankPage()),

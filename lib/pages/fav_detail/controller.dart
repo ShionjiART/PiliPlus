@@ -19,6 +19,7 @@ import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:flutter/widgets.dart' show Text, ValueChanged;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
@@ -223,7 +224,7 @@ class FavDetailController
           SmartDialog.showToast('内容太多啦！超过1000不支持排序');
           return;
         }
-        Get.to(FavSortPage(favDetailController: this));
+        Get.toSafe(FavSortPage(favDetailController: this));
       }
     }
   }

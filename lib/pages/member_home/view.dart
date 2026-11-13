@@ -23,6 +23,7 @@ import 'package:PiliPlus/pages/member_opus/widgets/opus_grid.dart';
 import 'package:PiliPlus/pages/member_pgc/widgets/pgc_card_v_member_pgc.dart';
 import 'package:PiliPlus/utils/grid.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:flutter/rendering.dart'
     show BoxHitTestEntry, BoxHitTestResult, RenderObjectWithChildMixin;
 import 'package:flutter/services.dart'
@@ -253,7 +254,7 @@ class _MemberHomeState extends State<MemberHome>
                   _ctr.tabController?.animateTo(index);
                 } else {
                   if (param == 'coinArchive') {
-                    Get.to(
+                    Get.toSafe(
                       MemberCoinArcPage(
                         mid: _ctr.mid,
                         name: _ctr.username,
@@ -263,7 +264,7 @@ class _MemberHomeState extends State<MemberHome>
                   }
 
                   if (param == 'likeArchive') {
-                    Get.to(
+                    Get.toSafe(
                       MemberLikeArcPage(
                         mid: _ctr.mid,
                         name: _ctr.username,
