@@ -77,7 +77,14 @@ class _HomePageState extends CommonPageState<HomePage>
     }
     return Column(
       children: [
-        if (_mainController.useBottomNav) customAppBar(),
+        if (_mainController.useBottomNav)
+          // iPhone Duo：头像、搜索和私信都在竖状态栏顶部，首页顶部这一行不再显示
+          ValueListenableBuilder(
+            valueListenable: IOSNativeTabBar.toolsShown,
+            builder: (context, toolsShown, child) =>
+                toolsShown ? const SizedBox.shrink() : child!,
+            child: customAppBar(),
+          ),
         tabBar,
         Expanded(
           child: onBuild(
@@ -98,19 +105,8 @@ class _HomePageState extends CommonPageState<HomePage>
         searchBar(),
         const SizedBox(width: 4),
         msgBadge(_mainController),
-        // iPhone Duo：头像移到了竖状态栏顶部
-        ValueListenableBuilder(
-          valueListenable: IOSNativeTabBar.toolsShown,
-          builder: (context, toolsShown, _) => toolsShown
-              ? const SizedBox.shrink()
-              : Padding(
-                  padding: const EdgeInsets.only(left: 8),
-                  child: userAvatar(
-                    colorScheme: _colorScheme,
-                    mainController: _mainController,
-                  ),
-                ),
-        ),
+        const SizedBox(width: 8),
+        userAvatar(colorScheme: _colorScheme, mainController: _mainController),
       ],
     );
     if (_homeController.hideTopBar) {
