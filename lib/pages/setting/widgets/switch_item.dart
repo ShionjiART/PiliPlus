@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:PiliPlus/common/widgets/dialog/dialog.dart';
 import 'package:PiliPlus/common/widgets/flutter/list_tile.dart';
 import 'package:PiliPlus/utils/storage.dart';
@@ -11,6 +13,13 @@ class SetSwitchItem extends StatefulWidget {
   final String setKey;
   final bool defaultVal;
   final ValueChanged<bool>? onChanged;
+
+  /// Asked before the new value is saved; returning false keeps the old one.
+  final Future<bool> Function(BuildContext context, bool value)? confirmChange;
+
+  /// While this other boolean setting is on, the switch shows on and is
+  /// disabled (its own value is not changed).
+  final String? lockedOnBy;
   final bool needReboot;
   final Widget? leading;
   final void Function(BuildContext context)? onTap;
@@ -25,6 +34,8 @@ class SetSwitchItem extends StatefulWidget {
     required this.setKey,
     this.defaultVal = false,
     this.onChanged,
+    this.confirmChange,
+    this.lockedOnBy,
     this.needReboot = false,
     this.leading,
     this.onTap,
@@ -52,10 +63,29 @@ class _SetSwitchItemState extends State<SetSwitchItem> {
     }
   }
 
+  StreamSubscription? _lockSubscription;
+
+  bool get _locked => switch (widget.lockedOnBy) {
+    final key? => GStorage.setting.get(key, defaultValue: false) == true,
+    null => false,
+  };
+
   @override
   void initState() {
     super.initState();
     _setVal();
+    if (widget.lockedOnBy case final key?) {
+      _lockSubscription = GStorage.setting.watch(key: key).listen((_) {
+        _setVal();
+        if (mounted) setState(() {});
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _lockSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> switchChange([bool? value]) async {
@@ -70,6 +100,14 @@ class _SetSwitchItemState extends State<SetSwitchItem> {
       if (!val) return;
     }
 
+    if (widget.confirmChange case final confirm?) {
+      if (!mounted) return;
+      if (!await confirm(context, val)) {
+        val = !val;
+        return;
+      }
+    }
+
     await GStorage.setting.put(widget.setKey, val);
 
     widget.onChanged?.call(val);
@@ -80,29 +118,32 @@ class _SetSwitchItemState extends State<SetSwitchItem> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final locked = _locked;
     final titleStyle =
         widget.titleStyle ??
         theme.textTheme.titleMedium!.copyWith(
-          color: widget.onTap != null && !val
+          color: locked || (widget.onTap != null && !val)
               ? theme.colorScheme.outline
               : null,
         );
     final subTitleStyle = theme.textTheme.labelMedium!.copyWith(
-      color: theme.colorScheme.outline,
+      color: locked
+          ? theme.colorScheme.outline.withValues(alpha: 0.6)
+          : theme.colorScheme.outline,
     );
 
     final switchBtn = Transform.scale(
       scale: 0.8,
       alignment: .centerRight,
       child: Switch(
-        value: val,
-        onChanged: switchChange,
+        value: locked || val,
+        onChanged: locked ? null : switchChange,
       ),
     );
 
     Widget child(Widget? trailing) => ListTile(
       contentPadding: widget.contentPadding,
-      enabled: widget.onTap == null ? true : val,
+      enabled: !locked && (widget.onTap == null || val),
       onTap: widget.onTap == null ? switchChange : () => widget.onTap!(context),
       title: Text(widget.title, style: titleStyle),
       subtitle: widget.subtitle != null

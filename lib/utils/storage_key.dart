@@ -13,6 +13,8 @@ abstract final class SettingBoxKey {
       defaultToastOp = 'defaultToastOp',
       defaultPicQa = 'defaultPicQa',
       enableHA = 'enableHA',
+      systemPlayerHdr = 'systemPlayerHdr',
+      systemPlayerAll = 'systemPlayerAll',
       audioOutput = 'audioOutput',
       bufferSize = 'bufferSize',
       bufferSec = 'bufferSec',
@@ -167,7 +169,8 @@ abstract final class SettingBoxKey {
       blockAtOnlyReply = 'blockAtOnlyReply',
       blockReplyAtCount = 'blockReplyAtCount',
       filterIntro = 'filterIntro',
-      showRefreshFAB = 'showRefreshFAB';
+      showRefreshFAB = 'showRefreshFAB',
+      autoWearMedal = 'autoWearMedal';
 
   static const String superChatType = 'superChatType',
       enableFullScreenSC = 'enableFullScreenSC',

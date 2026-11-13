@@ -48,9 +48,12 @@ import 'package:PiliPlus/pages/video/post_panel/view.dart';
 import 'package:PiliPlus/pages/video/send_danmaku/view.dart';
 import 'package:PiliPlus/pages/video/widgets/header_control.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
+import 'package:PiliPlus/plugin/pl_player/models/data_status.dart';
 import 'package:PiliPlus/plugin/pl_player/models/data_source.dart';
 import 'package:PiliPlus/plugin/pl_player/models/heart_beat_type.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
+import 'package:PiliPlus/plugin/pl_player/subtitle_cues.dart';
+import 'package:PiliPlus/plugin/pl_player/system_player.dart';
 import 'package:PiliPlus/services/download/download_service.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/connectivity_utils.dart';
@@ -378,6 +381,8 @@ class VideoDetailController extends GetxController
       this.subtitles.assignAll(subtitles);
       vttSubtitlesIndex.value = 0;
     }
+    // volume
+    volume = entry.volume;
     firstVideo = VideoItem(
       id: entry.preferedVideoQuality,
       quality: VideoQuality.fromCode(entry.preferedVideoQuality),
@@ -574,6 +579,12 @@ class VideoDetailController extends GetxController
   BlockConfigMixin get blockConfig => plPlayerController;
   @override
   Player? get player => plPlayerController.videoPlayerController;
+
+  @override
+  Stream<Duration> get positionStream => plPlayerController.positionStream;
+
+  @override
+  Stream<Duration> get bufferStream => plPlayerController.bufferStream;
   @override
   bool get isFullScreen => plPlayerController.isFullScreen.value;
   @override
@@ -716,12 +727,82 @@ class VideoDetailController extends GetxController
     return bestVideo ?? videoList.first;
   }
 
+  static final Map<String, bool> _hwDecodeSupport = {};
+
+  /// iOS: play with the system player (AVPlayer) instead of mpv when the
+  /// settings ask for it. mpv only outputs SDR on iOS, so HDR / Dolby Vision
+  /// look wrong there. Returns null to keep mpv.
+  Future<SystemPlayerSource?> _systemPlayerSource() async {
+    if (!SystemPlayer.isSupported ||
+        isFileSource ||
+        plPlayerController.onlyPlayAudio.value) {
+      return null;
+    }
+    final codecs = firstVideo.codecs ?? '';
+    final isHdr =
+        const {
+          125, // HDR 真彩
+          126, // 杜比视界
+          129, // HDR Vivid
+        }.contains(firstVideo.quality.code) ||
+        codecs.startsWith('dvh1') ||
+        codecs.startsWith('dvhe');
+    if (!(Pref.systemPlayerAll || (isHdr && Pref.systemPlayerHdr))) {
+      return null;
+    }
+    void skip(String reason) {
+      if (kDebugMode) debugPrint('system player skipped: $reason ($codecs)');
+    }
+
+    // AVPlayer cannot open HEVC tagged `hev1` (parameter sets in-band), which
+    // bilibili uses for most SDR HEVC streams. HDR streams are `hvc1`.
+    if (!isHdr && codecs.startsWith('hev1')) {
+      skip('hev1');
+      return null;
+    }
+    // AVPlayer has no software AV1 decoder.
+    final family = codecs.length >= 4 ? codecs.substring(0, 4) : codecs;
+    if (family == 'av01') {
+      final supported = _hwDecodeSupport[family] ??=
+          await SystemPlayer.supportsHardwareDecode(family);
+      if (!supported) {
+        skip('no AV1 hardware decoder');
+        return null;
+      }
+    }
+
+    final video = SystemPlayerTrack.fromItem(firstVideo, videoUrl!);
+    if (video == null) {
+      skip('video has no segment index');
+      return null;
+    }
+    SystemPlayerTrack? audio;
+    if (audioUrl case final url? when url.isNotEmpty) {
+      // The CDN setting may have swapped the host, so match by path.
+      final path = Uri.tryParse(url)?.path;
+      final item = data.dash?.audio?.firstWhereOrNull(
+        (e) => e.playUrls.any((u) => u == url || Uri.tryParse(u)?.path == path),
+      );
+      audio = item == null ? null : SystemPlayerTrack.fromItem(item, url);
+      // Video without its audio would be worse than mpv.
+      if (audio == null) {
+        skip(item == null ? 'audio not found' : 'audio has no segment index');
+        return null;
+      }
+    }
+    return SystemPlayerSource(
+      video: video,
+      audio: audio,
+      frameRate: double.tryParse(firstVideo.frameRate ?? ''),
+    );
+  }
+
   /// 更新画质、音质
   void updatePlayer() {
     final currentVideoQa = this.currentVideoQa.value;
     if (currentVideoQa == null) return;
     _autoPlay.value = true;
-    playedTime = plPlayerController.videoPlayerController?.state.position;
+    playedTime = plPlayerController.currentPosition;
     plPlayerController
       ..isBuffering.value = false
       ..buffered.value = 0;
@@ -754,13 +835,26 @@ class VideoDetailController extends GetxController
     return null;
   }
 
+  /// 所有视频页共用同一个播放器。被新页面盖住或已关闭的页面，播放地址晚到时
+  /// 不能再去改播放器，否则会换掉当前页正在播的视频，或者和当前页同时创建播放器，
+  /// 导致黑屏（有时有声音）。回到这一页时 didPopNext 会重新初始化。
+  /// 没有 owner 时（例如直播间关闭时清空了）不拦截。
+  bool get _ownsPlayer {
+    if (isClosed) return false;
+    final owner = PlPlayerController.playOwner;
+    return owner == null || owner.tag == heroTag;
+  }
+
   Future<void> playerInit({
     bool? autoplay,
     bool autoFullScreenFlag = false,
   }) async {
+    if (!_ownsPlayer || (!isFileSource && videoUrl == null)) return;
     Duration? seek = defaultST ?? playedTime;
     if (seek == .zero) seek = null;
     seek ??= getFirstSegment();
+    final systemSource = await _systemPlayerSource();
+    if (!_ownsPlayer) return;
     await plPlayerController.setDataSource(
       isFileSource
           ? FileSource(
@@ -795,9 +889,19 @@ class VideoDetailController extends GetxController
       volume: volume,
       autoFullScreenFlag: autoFullScreenFlag,
       rotate: _rotate,
+      systemSource: systemSource,
     );
 
     if (isClosed) return;
+
+    // 初始化失败时退回封面和播放按钮，点一下就能重试，而不是一直黑屏
+    if (_ownsPlayer &&
+        plPlayerController.dataStatus.value == DataStatus.error) {
+      videoState.value = false;
+      _autoPlay.value = false;
+      SmartDialog.showToast('播放器初始化失败，点击封面重试');
+      return;
+    }
 
     if (plPlayerController.enableBlock) {
       initSkip();
@@ -972,6 +1076,15 @@ class VideoDetailController extends GetxController
         }
       }
 
+      final video = dash.video;
+      if (video == null || video.isEmpty) {
+        Utils.reportError(
+          'null or empty dash video:\n'
+          'bvid: $bvid, cid: $cid, seasonId: $seasonId, epId: $epId, '
+          'videoType: $_actualVideoType',
+        );
+        return;
+      }
       final cacheVideoQa = plPlayerController.cacheVideoQa!;
       final (
         int targetQuality,
@@ -979,7 +1092,7 @@ class VideoDetailController extends GetxController
         VideoDecodeFormatType targetDecode,
         VideoItem targetVideo,
       ) = VideoUtils.findTargetVideo(
-        dash.video!,
+        video,
         cacheVideoQa,
         response.acceptQuality,
         response.supportFormats!,
@@ -1090,6 +1203,7 @@ class VideoDetailController extends GetxController
   // 设定字幕轨道
   Future<void> setSubtitle(int index) async {
     if (index <= 0) {
+      plPlayerController.setSystemSubtitle(null);
       await plPlayerController.videoPlayerController?.setSubtitleTrack(.no());
       vttSubtitlesIndex.value = index;
       return;
@@ -1130,6 +1244,30 @@ class VideoDetailController extends GetxController
       SubtitleTrack(subUri, sub.lanDoc, sub.lan, uri: true),
     );
     vttSubtitlesIndex.value = index;
+    if (SystemPlayer.isSupported) await _setSystemSub(subtitle);
+  }
+
+  /// The iOS system player shows subtitles in Flutter, so it needs the cues.
+  /// Kept up to date even while mpv plays, for a later switch of engine.
+  Future<void> _setSystemSub(SubtitleData subtitle) async {
+    try {
+      final content = subtitle.isData
+          ? subtitle.id
+          : await File(subtitle.id).readAsString();
+      final cues = await compute(
+        (String text) => SubtitleCueParser.parse(
+          text,
+          fileName: subtitle.isData ? null : subtitle.id,
+        ),
+        content,
+      );
+      if (!isClosed) plPlayerController.setSystemSubtitle(cues);
+    } catch (e) {
+      if (kDebugMode) debugPrint('system player subtitle: $e');
+      if (plPlayerController.usingSystemPlayer.value) {
+        SmartDialog.showToast('系统播放器无法读取该字幕');
+      }
+    }
   }
 
   // interactive video
@@ -1325,6 +1463,9 @@ class VideoDetailController extends GetxController
     if (plPlayerController.showViewPoints) {
       viewPointList.clear();
     }
+
+    // volume
+    volume = null;
 
     if (!isFileSource) {
       // language

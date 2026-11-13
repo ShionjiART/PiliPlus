@@ -823,6 +823,14 @@ abstract final class Pref {
   static bool get enableHA =>
       _setting.get(SettingBoxKey.enableHA, defaultValue: true);
 
+  /// iOS: play HDR / Dolby Vision videos with the system player (AVPlayer).
+  static bool get systemPlayerHdr =>
+      _setting.get(SettingBoxKey.systemPlayerHdr, defaultValue: true);
+
+  /// iOS, experimental: play every on-demand video with the system player.
+  static bool get systemPlayerAll =>
+      _setting.get(SettingBoxKey.systemPlayerAll, defaultValue: false);
+
   static Set<int> get danmakuBlockType => Set<int>.from(
     _setting.get(SettingBoxKey.danmakuBlockType, defaultValue: const <int>{}),
   );
@@ -1143,4 +1151,7 @@ abstract final class Pref {
 
   static bool get cachePlayInfo =>
       _setting.get(SettingBoxKey.cachePlayInfo, defaultValue: true);
+
+  static bool get autoWearMedal =>
+      _setting.get(SettingBoxKey.autoWearMedal, defaultValue: false);
 }

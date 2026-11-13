@@ -34,6 +34,7 @@ import 'package:PiliPlus/pages/video/introduction/ugc/widgets/action_item.dart';
 import 'package:PiliPlus/pages/video/introduction/ugc/widgets/menu_row.dart';
 import 'package:PiliPlus/pages/video/widgets/header_mixin.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
+import 'package:PiliPlus/plugin/pl_player/system_player.dart';
 import 'package:PiliPlus/plugin/pl_player/models/data_source.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_repeat.dart';
 import 'package:PiliPlus/services/shutdown_timer_service.dart'
@@ -581,8 +582,13 @@ class HeaderControlState extends State<HeaderControl>
                                     !onlyPlayAudio;
                                 final player =
                                     plPlayerController.videoPlayerController!;
-                                if (onlyPlayAudio &&
-                                    player.state.tracks.video.length <= 2) {
+                                // The system player has no audio-only mode:
+                                // reload, which picks mpv for audio-only.
+                                if (plPlayerController
+                                        .usingSystemPlayer
+                                        .value ||
+                                    onlyPlayAudio &&
+                                        player.state.tracks.video.length <= 2) {
                                   videoDetailCtr.playerInit();
                                 } else {
                                   player.setProperty(
@@ -747,7 +753,16 @@ class HeaderControlState extends State<HeaderControl>
                     dense: true,
                     title: const Text('播放信息', style: titleStyle),
                     leading: const Icon(Icons.info_outline, size: 20),
-                    onTap: () => showPlayerInfo(context, player: player),
+                    onTap: () {
+                      if (plPlayerController.usingSystemPlayer.value) {
+                        showSystemPlayerInfo(
+                          context,
+                          player: plPlayerController.systemPlayer!,
+                        );
+                      } else {
+                        showPlayerInfo(context, player: player);
+                      }
+                    },
                   ),
                 ListTile(
                   dense: true,
@@ -767,6 +782,98 @@ class HeaderControlState extends State<HeaderControl>
           ),
         );
       },
+    );
+  }
+
+  /// Playback info while the iOS system player (AVPlayer) is in use; mpv's
+  /// state is empty then.
+  static Future<void> showSystemPlayerInfo(
+    BuildContext context, {
+    required SystemPlayer player,
+  }) async {
+    final info = await player.info();
+    if (!context.mounted) return;
+    String? str(String key) => info[key]?.toString();
+    String mbps(Object? bps) =>
+        bps is num && bps > 0 ? '${(bps / 1e6).toStringAsFixed(2)} Mbps' : '-';
+
+    final width = info['width'] ?? info['codedWidth'];
+    final height = info['height'] ?? info['codedHeight'];
+    final range = str('videoRange') ?? 'SDR';
+    final dolby =
+        str('supplementalCodecs') ??
+        ((str('videoCodecs') ?? '').startsWith('dvh')
+            ? str('videoCodecs')
+            : null);
+    // bilibili's declared rate; AVPlayer's measured one is only a fallback.
+    final frameRate = info['frameRate'] ?? info['currentFrameRate'];
+    final media = [
+      ?str('videoUrl'),
+      ?str('audioUrl'),
+    ].join('\n');
+
+    final items = <(String, String)>[
+      ('Player', 'AVPlayer (system player)'),
+      ('Resolution', '${width ?? '-'}x${height ?? '-'}'),
+      ('VideoCodecs', str('videoCodecs') ?? '-'),
+      (
+        'VideoRange',
+        switch (range) {
+          'PQ' => 'PQ (HDR10 / Dolby Vision)',
+          'HLG' => 'HLG',
+          _ => 'SDR',
+        },
+      ),
+      if (dolby != null) ('DolbyVision', dolby),
+      (
+        'FrameRate',
+        frameRate is num ? frameRate.toStringAsFixed(3) : '-',
+      ),
+      ('AudioCodecs', str('audioCodecs') ?? '-'),
+      ('Bitrate', mbps(info['indicatedBitrate'])),
+      ('ObservedBitrate', mbps(info['observedBitrate'])),
+      ('DroppedFrames', str('droppedFrames') ?? '-'),
+      ('Media', media.isEmpty ? '-' : media),
+      ('rate', str('rate') ?? '-'),
+      ('hwdec', 'videotoolbox (AVPlayer)'),
+      if (info['eligibleForHDR'] == false)
+        ('HDR', 'not supported on this device'),
+    ];
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('播放信息'),
+        contentPadding: const EdgeInsets.only(top: 16),
+        content: Material(
+          type: MaterialType.transparency,
+          child: ListTileTheme(
+            contentPadding: const .symmetric(horizontal: 24),
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  for (final (title, value) in items)
+                    ListTile(
+                      dense: true,
+                      title: Text(title),
+                      subtitle: Text(value),
+                      onTap: () => Utils.copyText('$title\n$value'),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: Get.back,
+            child: Text(
+              '确定',
+              style: TextStyle(color: ColorScheme.of(context).outline),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

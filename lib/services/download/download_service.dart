@@ -30,7 +30,7 @@ import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/subtitle_utils.dart';
 import 'package:flutter/foundation.dart'
-    show kDebugMode, debugPrint, VoidCallback;
+    show kDebugMode, debugPrint, VoidCallback, visibleForTesting;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:path/path.dart' as path;
@@ -121,7 +121,9 @@ class DownloadService extends GetxService {
             } else {
               waitDownloadQueue.add(entry..status = DownloadStatus.wait);
             }
-          } catch (_) {}
+          } catch (_) {
+            if (kDebugMode) rethrow;
+          }
         }
       }
     }
@@ -130,7 +132,6 @@ class DownloadService extends GetxService {
   }
 
   void downloadVideo({
-    required int index,
     required Part page,
     VideoDetailData? videoDetail,
     ugc.EpisodeItem? videoArc,
@@ -400,13 +401,13 @@ class DownloadService extends GetxService {
 
   Future<bool> updateSegments(BiliDownloadEntryInfo entry) {
     if (entry.pageData != null) {
-      return _updateBlockSegments(entry);
+      return updateUgcSegments(entry);
     } else {
-      return _updatePgcSegments(entry);
+      return updatePgcSegmentsAndVolume(entry);
     }
   }
 
-  Future<bool> _updateBlockSegments(BiliDownloadEntryInfo entry) async {
+  Future<bool> updateUgcSegments(BiliDownloadEntryInfo entry) async {
     final res = await SponsorBlock.getSkipSegments(
       bvid: entry.bvid,
       cid: entry.pageData!.cid,
@@ -421,7 +422,7 @@ class DownloadService extends GetxService {
     return false;
   }
 
-  Future<bool> _updatePgcSegments(BiliDownloadEntryInfo entry) async {
+  Future<bool> updatePgcSegmentsAndVolume(BiliDownloadEntryInfo entry) async {
     final ep = entry.ep;
     if (ep == null) return false;
     final res = await VideoHttp.videoUrl(
@@ -436,11 +437,24 @@ class DownloadService extends GetxService {
         'pugv' => .pugv,
         _ => .pgc,
       },
+      voiceBalance: true,
     );
     if (res case Success(:final response)) {
+      bool needsUpdate = false;
+
       final clipInfoList = response.clipInfoList;
       if (clipInfoList != null && clipInfoList.isNotEmpty) {
         entry.segments = clipInfoList;
+        needsUpdate = true;
+      }
+
+      final volume = response.volume;
+      if (volume != null) {
+        entry.volume = volume;
+        needsUpdate = true;
+      }
+
+      if (needsUpdate) {
         await _updateBiliDownloadEntryJson(entry);
       }
       return true;
@@ -512,6 +526,82 @@ class DownloadService extends GetxService {
     }
   }
 
+  Future<bool> updateVolume(BiliDownloadEntryInfo entry) {
+    if (entry.pageData != null) {
+      return updateUgcVolume(entry);
+    } else {
+      return updatePgcSegmentsAndVolume(entry);
+    }
+  }
+
+  Future<bool> updateUgcVolume(BiliDownloadEntryInfo entry) async {
+    assert(entry.ep == null);
+    final res = await VideoHttp.videoUrl(
+      avid: entry.avid,
+      bvid: entry.bvid,
+      cid: entry.cid,
+      qn: entry.preferedVideoQuality,
+      tryLook: false,
+      videoType: .ugc,
+      voiceBalance: true,
+    );
+    if (res case Success(:final response)) {
+      final volume = response.volume;
+      if (volume != null) {
+        entry.volume = volume;
+        await _updateBiliDownloadEntryJson(entry);
+      }
+      return true;
+    }
+    return false;
+  }
+
+  Future<bool> updateSeasonInfo(
+    BiliDownloadEntryInfo entry, {
+    bool refresh = false,
+  }) {
+    if (entry.pageData != null) {
+      return updateUgcSeasonInfo(entry, refresh: refresh);
+    } else {
+      return Future.syncValue(true);
+    }
+  }
+
+  void refreshIfUpdated(bool isSuccess) {
+    if (isSuccess) flagNotifier.refresh();
+  }
+
+  Future<bool> updateUgcSeasonInfo(
+    BiliDownloadEntryInfo entry, {
+    bool refresh = false,
+  }) async {
+    assert(entry.ep == null);
+    try {
+      final bvid = entry.bvid;
+      final res = await VideoHttp.videoIntro(bvid: bvid);
+      if (res case Success(:final response)) {
+        if (response.hasSeason) {
+          int indexInSeason = 0;
+          for (final section in response.ugcSeason!.sections!) {
+            for (final episode in section.episodes!) {
+              if (episode.bvid == bvid) {
+                entry.seasonInfo = response.seasonInfo(indexInSeason);
+                await _updateBiliDownloadEntryJson(entry);
+                if (refresh) flagNotifier.refresh();
+                return true;
+              }
+              indexInSeason++;
+            }
+          }
+        }
+        return true;
+      }
+    } catch (_) {
+      if (kDebugMode) rethrow;
+    }
+    return false;
+  }
+
   Future<void> _startDownload(BiliDownloadEntryInfo entry) async {
     try {
       if (!await downloadDanmaku(entry: entry)) {
@@ -520,22 +610,26 @@ class DownloadService extends GetxService {
 
       // ugc segments
       if (entry.pageData != null && Pref.enableSponsorBlock) {
-        _updateBlockSegments(entry);
+        updateUgcSegments(entry);
       }
 
       _updateCurStatus(DownloadStatus.getPlayUrl);
 
       final noSegmentBefore = entry.segments == null;
+      final noVolumeBefore = entry.volume == null;
 
+      final qaBefore = entry.preferedVideoQuality;
       final mediaFileInfo = await DownloadHttp.getVideoUrl(
         entry: entry,
         ep: entry.ep,
         source: entry.source,
         pageData: entry.pageData,
       );
+      if (qaBefore != entry.preferedVideoQuality) waitDownloadQueue.refresh();
 
-      // pgc segments
-      if (noSegmentBefore && entry.segments != null) {
+      // pgc segments, volume
+      if ((noSegmentBefore && entry.segments != null) ||
+          (noVolumeBefore && entry.volume != null)) {
         await _updateBiliDownloadEntryJson(entry);
       }
 
@@ -545,6 +639,7 @@ class DownloadService extends GetxService {
       }
 
       final mediaJsonFile = File(path.join(videoDir.path, _indexFile));
+      await _removeStalePartialFiles(mediaJsonFile, videoDir, mediaFileInfo);
       await Future.wait([
         mediaJsonFile.writeAsString(jsonEncode(mediaFileInfo.toJson())),
         _downloadCover(entry: entry),
@@ -593,12 +688,66 @@ class DownloadService extends GetxService {
         default:
           break;
       }
-    } catch (e) {
+    } catch (e, s) {
       _updateCurStatus(DownloadStatus.failPlayUrl);
       if (kDebugMode) {
-        debugPrint('get download url error: $e');
+        debugPrint('get download url error: $e\n\n$s');
       }
     }
+  }
+
+  /// 续传时重新获取的播放地址可能是另一条流（编码、音质或文件大小变了），
+  /// 这时已下载的部分不能接着用，否则会拼成一个损坏的文件。
+  static Future<void> _removeStalePartialFiles(
+    File mediaJsonFile,
+    Directory videoDir,
+    BiliDownloadMediaInfo newInfo,
+  ) async {
+    if (!mediaJsonFile.existsSync()) {
+      return;
+    }
+    BiliDownloadMediaInfo? oldInfo;
+    try {
+      final json = jsonDecode(await mediaJsonFile.readAsString());
+      oldInfo = switch (newInfo) {
+        Type1() => Type1.fromJson(json),
+        Type2() => Type2.fromJson(json),
+        _ => null,
+      };
+    } catch (_) {}
+    final (sameVideo, sameAudio) = isSameMediaStream(oldInfo, newInfo);
+    if (!sameVideo) {
+      await File(path.join(videoDir.path, PathUtils.videoNameType1)).tryDel();
+      await File(path.join(videoDir.path, PathUtils.videoNameType2)).tryDel();
+    }
+    if (!sameAudio) {
+      await File(path.join(videoDir.path, PathUtils.audioNameType2)).tryDel();
+    }
+  }
+
+  /// 返回 (视频是同一条流, 音频是同一条流)
+  @visibleForTesting
+  static (bool, bool) isSameMediaStream(
+    BiliDownloadMediaInfo? oldInfo,
+    BiliDownloadMediaInfo newInfo,
+  ) {
+    bool sameFile(Type2File? a, Type2File? b) =>
+        a?.id == b?.id &&
+        a?.codecid == b?.codecid &&
+        a?.bandwidth == b?.bandwidth;
+    return switch ((oldInfo, newInfo)) {
+      (Type1 a, Type1 b) => (
+        a.segmentList.firstOrNull?.bytes == b.segmentList.firstOrNull?.bytes &&
+            a.segmentList.firstOrNull?.order ==
+                b.segmentList.firstOrNull?.order,
+        true,
+      ),
+      (Type2 a, Type2 b) => (
+        sameFile(a.video.firstOrNull, b.video.firstOrNull),
+        sameFile(a.audio?.firstOrNull, b.audio?.firstOrNull),
+      ),
+      _ => (false, false),
+    };
   }
 
   Future<void> _updateBiliDownloadEntryJson(BiliDownloadEntryInfo entry) {
