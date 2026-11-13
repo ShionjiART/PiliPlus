@@ -37,7 +37,7 @@
 - [x] 动态详情页顶部不再空出一条：作者直接在最上面，往上滑过作者后顶栏才浮出来，标签栏停在顶栏下面（[#33](https://github.com/ShionjiART/PiliPlus/pull/33)）
 - [x] 音乐详情页顶部也不再空出一条：歌曲卡片直接在最上面，往上滑过后顶栏才浮出来，评论栏停在顶栏下面（[#41](https://github.com/ShionjiART/PiliPlus/pull/41)）
 - [x] 合上时视频页暂停后往上滑、播放器收成一条工具栏，右边的 ⋮ 不再被摄像头挡住：按钮和播放器控件一样避开左右安全区（[#40](https://github.com/ShionjiART/PiliPlus/pull/40)）
-- [ ] 移植 [@Stasert](https://github.com/Stasert) 的竖栏导航等功能，进度见 [#2](https://github.com/ShionjiART/PiliPlus/issues/2)
+- [x] 移植 [Stasert](https://github.com/Stasert) 的竖栏导航等功能：能用的都已移植，其余几项决定不移植，逐项记录见 [#2](https://github.com/ShionjiART/PiliPlus/issues/2)
 
 ## 播放
 
