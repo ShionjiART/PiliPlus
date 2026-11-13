@@ -1692,8 +1692,14 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
         if (!isLive)
           Positioned(
             bottom: -2.2,
-            left: 0,
-            right: 0,
+            // 和底部控制条一样避开左右安全区（iPhone Duo 合上时摄像头在
+            // 竖状态栏里，竖状态栏隐藏后安全区仍在）
+            left: plPlayerController.removeSafeArea
+                ? 0
+                : MediaQuery.viewPaddingOf(context).left,
+            right: plPlayerController.removeSafeArea
+                ? 0
+                : MediaQuery.viewPaddingOf(context).right,
             child: Obx(
               () {
                 final showControls = plPlayerController.showControls.value;
