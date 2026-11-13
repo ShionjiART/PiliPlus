@@ -19,6 +19,7 @@
 - [x] 旋转或开合时页面不会被重置
 - [x] 之前手动打开过「横屏适配」的用户，升级后仍保持打开
 - [x] 修复真机合上时启动卡在启动画面
+- [x] 视频页偶尔右侧留出空白（时间和 Wi-Fi 没隐藏）：每次都和系统重新同步竖状态栏状态，回到前台时重新确认（[#18](https://github.com/ShionjiART/PiliPlus/pull/18)）
 - [ ] 直接打开的页面也避开竖状态栏，修复通讯录页标签栏伸到竖栏下面（[#4](https://github.com/ShionjiART/PiliPlus/pull/4)）
 - [ ] 移植 [@Stasert](https://github.com/Stasert) 的竖栏导航等功能，进度见 [#2](https://github.com/ShionjiART/PiliPlus/issues/2)
 
