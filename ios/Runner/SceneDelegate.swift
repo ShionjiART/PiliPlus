@@ -487,6 +487,8 @@ final class NativePageNavigationController: UINavigationController {
   }
 
   private weak var avatarItem: UIBarButtonItem?
+  /// Side of the avatar photo in points; Dart asks for a 120px image to match.
+  private static let avatarSide: CGFloat = 38
 
   private func makeToolItem(_ id: String) -> UIBarButtonItem {
     let item = UIBarButtonItem(
@@ -505,7 +507,9 @@ final class NativePageNavigationController: UINavigationController {
     guard let source = URL(string: url) else { return }
     avatarTask = URLSession.shared.dataTask(with: source) { [weak self, weak item] data, _, _ in
       guard let data, let image = UIImage(data: data) else { return }
-      let size = CGSize(width: 30, height: 30)
+      // Nearly fills the round glass button (about 48pt), leaving a thin ring,
+      // so the photo reads as large as the search and notification icons.
+      let size = CGSize(width: Self.avatarSide, height: Self.avatarSide)
       let circle = UIGraphicsImageRenderer(size: size).image { _ in
         UIBezierPath(ovalIn: CGRect(origin: .zero, size: size)).addClip()
         // Fill the circle, cropping the longer side.

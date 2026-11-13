@@ -5,11 +5,13 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   List<NativeTabTool> tools({
     bool loggedIn = true,
+    bool? hasAccount,
     String? unread,
     DynamicBadgeMode badgeMode = .number,
     String face = '',
   }) => nativeTabTools(
     loggedIn: loggedIn,
+    hasAccount: hasAccount ?? loggedIn,
     unread: unread,
     badgeMode: badgeMode,
     face: face,
@@ -30,10 +32,22 @@ void main() {
     expect(list.first.title, '点击登录');
   });
 
+  test('选了匿名时仍存有账号：没有私信，头像是人形图标，点了弹出账号切换', () {
+    final list = tools(
+      loggedIn: false,
+      hasAccount: true,
+      unread: '5',
+      face: 'https://a/b.jpg',
+    );
+    expect(list.map((e) => e.id), ['mine', 'search']);
+    expect(list.first.image, isNull);
+    expect(list.first.title, '切换账号', reason: '能切回原来的账号');
+  });
+
   test('登录后头像用 https 的小图', () {
     expect(
       tools(face: 'http://i0.hdslb.com/bfs/face/a.jpg').first.image,
-      'https://i0.hdslb.com/bfs/face/a.jpg@96w_96h.webp',
+      'https://i0.hdslb.com/bfs/face/a.jpg@120w_120h.webp',
     );
     expect(tools().first.image, isNull, reason: '没有头像地址时用图标');
   });

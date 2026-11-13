@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:PiliPlus/common/style.dart';
@@ -11,6 +12,7 @@ import 'package:PiliPlus/pages/home/view.dart';
 import 'package:PiliPlus/pages/login/controller.dart';
 import 'package:PiliPlus/pages/main/controller.dart';
 import 'package:PiliPlus/utils/android/bindings.g.dart';
+import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/app_scheme.dart';
 import 'package:PiliPlus/utils/desktop/tray_controller.dart';
 import 'package:PiliPlus/utils/desktop/window_controller.dart';
@@ -68,6 +70,7 @@ class _MainAppState extends PopScopeState<MainApp>
   }
 
   final List<Worker> _nativeTabBarWorkers = [];
+  StreamSubscription<void>? _accountsListener;
 
   Future<void> _attachNativeTabBar() async {
     final tabs = _mainController.navigationBars;
@@ -93,6 +96,8 @@ class _MainAppState extends PopScopeState<MainApp>
       ever(_mainController.msgUnReadCount, (_) => _updateTools()),
       ever(_mainController.accountService.face, (_) => _updateTools()),
     ]);
+    // 选了匿名时 isLogin 为 false，但本机仍存有账号；账号增删也要更新头像
+    _accountsListener = Accounts.account.watch().listen((_) => _updateTools());
     IOSNativeTabBar.onToolAction = _onTool;
     _updateTools();
     setState(() {
@@ -108,6 +113,7 @@ class _MainAppState extends PopScopeState<MainApp>
   void _updateTools() {
     final tools = nativeTabTools(
       loggedIn: _mainController.accountService.isLogin.value,
+      hasAccount: Accounts.account.isNotEmpty,
       unread: _mainController.msgUnReadCount.value,
       badgeMode: _mainController.msgBadgeMode,
       face: _mainController.accountService.face.value,
@@ -137,8 +143,10 @@ class _MainAppState extends PopScopeState<MainApp>
           ..lastCheckUnreadAt = DateTime.now().millisecondsSinceEpoch;
         Get.toNamed('/whisper');
       case 'mine':
-        // 已登录时弹出账号切换；未登录时去「我的」页面登录
-        if (_mainController.accountService.isLogin.value) {
+        // 本机存有账号时（包括选了匿名）弹出账号切换，以便切回原账号；
+        // 一个账号都没有时去「我的」页面登录
+        if (_mainController.accountService.isLogin.value ||
+            Accounts.account.isNotEmpty) {
           await LoginPageController.switchAccountDialog(context);
         } else {
           _mainController.toMinePage();
@@ -224,6 +232,7 @@ class _MainAppState extends PopScopeState<MainApp>
     for (final worker in _nativeTabBarWorkers) {
       worker.dispose();
     }
+    _accountsListener?.cancel();
     if (IOSNativeTabBar.onToolAction == _onTool) {
       IOSNativeTabBar.onToolAction = null;
     }
