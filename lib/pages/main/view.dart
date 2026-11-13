@@ -6,6 +6,7 @@ import 'package:PiliPlus/common/widgets/floating_navigation_bar.dart';
 import 'package:PiliPlus/common/widgets/flutter/pop_scope.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/main_layout.dart';
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
 import 'package:PiliPlus/common/widgets/route_aware_mixin.dart';
 import 'package:PiliPlus/models/common/nav_bar_config.dart';
 import 'package:PiliPlus/pages/home/view.dart';
@@ -468,21 +469,37 @@ class _MainAppState extends PopScopeState<MainApp>
 
   @override
   Widget build(BuildContext context) {
-    Widget child;
-    if (_mainController.mainTabBarView) {
-      child = TabBarView(
-        controller: _mainController.controller,
-        physics: const NeverScrollableScrollPhysics(),
-        scrollDirection: _mainController.useBottomNav ? .horizontal : .vertical,
-        children: _mainController.navigationBars.map((i) => i.page).toList(),
-      );
-    } else {
-      child = PageView(
-        controller: _mainController.controller,
-        physics: const NeverScrollableScrollPhysics(),
-        children: _mainController.navigationBars.map((i) => i.page).toList(),
-      );
-    }
+    final Axis axis =
+        _mainController.mainTabBarView && !_mainController.useBottomNav
+        ? .vertical
+        : .horizontal;
+    // 延伸到竖状态栏下面（iPhone Duo），否则这一层会按让出竖状态栏后的宽度
+    // 裁切，页面里左右滑动的内容画不到竖状态栏下面，见 [RailPageViewport]
+    Widget child = RailPageViewport(
+      axis: axis,
+      builder: (right) {
+        final pages = _mainController.navigationBars
+            .map(
+              (i) => Padding(
+                padding: EdgeInsets.only(right: right),
+                child: i.page,
+              ),
+            )
+            .toList();
+        return _mainController.mainTabBarView
+            ? TabBarView(
+                controller: _mainController.controller,
+                physics: const NeverScrollableScrollPhysics(),
+                scrollDirection: axis,
+                children: pages,
+              )
+            : PageView(
+                controller: _mainController.controller,
+                physics: const NeverScrollableScrollPhysics(),
+                children: pages,
+              );
+      },
+    );
     child = KeyedSubtree(key: _bodyKey, child: child);
 
     Widget? sideBar;

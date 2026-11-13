@@ -1,3 +1,4 @@
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
 import 'package:PiliPlus/common/assets.dart';
 import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/avatars.dart';
@@ -673,7 +674,7 @@ class UserInfoCard extends StatelessWidget {
           SizedBox(
             width: .infinity,
             height: kHeaderHeight,
-            child: PageView.builder(
+            child: RailPageView.builder(
               controller: controller,
               itemCount: imgUrls.length,
               physics: tabBarScrollPhysics,

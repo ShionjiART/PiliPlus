@@ -2,6 +2,7 @@ import 'dart:async' show scheduleMicrotask;
 import 'dart:io' show Platform;
 import 'dart:math' show max;
 
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
 import 'package:PiliPlus/models/common/nav_bar_config.dart';
 import 'package:PiliPlus/utils/ios/foldable_helper.dart';
 import 'package:PiliPlus/utils/ios/native_navigation_batch.dart';
@@ -266,7 +267,15 @@ class NativeSafeArea extends StatelessWidget {
               bottom: max(0, viewPadding.bottom - mediaQuery.viewInsets.bottom),
             ),
           ),
-          child: child!,
+          // 竖状态栏（右侧安全区 ≥72，和 SceneDelegate 的判断一致；普通
+          // iPhone 横屏时的刘海不到 72）的位置，供左右滑动的页面延伸到它下面
+          child: RailViewportScope(
+            insets: insets.right >= 72
+                ? EdgeInsets.only(right: viewPadding.right)
+                : EdgeInsets.zero,
+            windowWidth: mediaQuery.size.width,
+            child: child!,
+          ),
         );
       },
       child: child,
