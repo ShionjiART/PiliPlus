@@ -345,3 +345,87 @@ final class SystemPlayerPlaylistLoader: NSObject, AVAssetResourceLoaderDelegate 
     return (asset, loader, videoMedia.info, audioMedia?.info)
   }
 }
+
+extension SystemPlayerHLS {
+  /// Codec info from the head of a local file (ftyp + moov), for the playback
+  /// info panel. Unlike `parse`, no `sidx` is needed.
+  static func info(head b: [UInt8]) -> TrackInfo {
+    var i = 0
+    while i + 8 <= b.count {
+      let size = Int(b[i]) << 24 | Int(b[i + 1]) << 16 | Int(b[i + 2]) << 8 | Int(b[i + 3])
+      guard size >= 8, i + size <= b.count else { break }
+      if String(bytes: b[(i + 4)..<(i + 8)], encoding: .ascii) == "moov" {
+        return trackInfo(b, i + 8, i + size)
+      }
+      i += size
+    }
+    return TrackInfo()
+  }
+}
+
+enum SystemPlayerLocalError: Error {
+  case unsupportedOS
+  case noVideoTrack
+}
+
+/// Downloaded (offline) DASH files. An HLS playlist cannot point at local
+/// files: AVPlayer reports CoreMedia -12881 ("custom url not redirect") for
+/// file:// segments, and serving segments through the resource loader crashes
+/// in MediaToolbox. A local fragmented MP4 opens at once (unlike a remote one,
+/// whose fragments are walked over the network), so the video and audio files
+/// are simply joined in a composition. HDR and Dolby Vision metadata stay in the
+/// tracks' format descriptions.
+enum SystemPlayerLocal {
+  static func makeAsset(video: URL, audio: URL?) async throws -> (
+    AVAsset, video: SystemPlayerHLS.TrackInfo, audio: SystemPlayerHLS.TrackInfo?
+  ) {
+    guard #available(iOS 15.0, *) else { throw SystemPlayerLocalError.unsupportedOS }
+    let videoAsset = try urlAsset(video)
+    guard let videoTrack = try await videoAsset.loadTracks(withMediaType: .video).first else {
+      throw SystemPlayerLocalError.noVideoTrack
+    }
+    let videoRange = try await videoTrack.load(.timeRange)
+    let composition = AVMutableComposition()
+    let compVideo = composition.addMutableTrack(
+      withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)
+    try compVideo?.insertTimeRange(videoRange, of: videoTrack, at: .zero)
+    compVideo?.preferredTransform = try await videoTrack.load(.preferredTransform)
+
+    var audioInfo: SystemPlayerHLS.TrackInfo?
+    if let audio {
+      let audioAsset = try urlAsset(audio)
+      if let audioTrack = try await audioAsset.loadTracks(withMediaType: .audio).first {
+        let range = try await audioTrack.load(.timeRange)
+        let compAudio = composition.addMutableTrack(
+          withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)
+        try compAudio?.insertTimeRange(
+          CMTimeRange(start: range.start, duration: min(range.duration, videoRange.duration)),
+          of: audioTrack, at: .zero)
+        audioInfo = SystemPlayerHLS.info(head: head(audio))
+      }
+    }
+    return (composition, SystemPlayerHLS.info(head: head(video)), audioInfo)
+  }
+
+  /// bilibili's files end in .m4s, which AVFoundation does not recognise as
+  /// MP4 ("Cannot Open"). iOS 17 can override the MIME type; older systems get
+  /// a temporary .mp4 symlink.
+  private static func urlAsset(_ url: URL) throws -> AVURLAsset {
+    if #available(iOS 17.0, *) {
+      return AVURLAsset(url: url, options: [AVURLAssetOverrideMIMETypeKey: "video/mp4"])
+    }
+    let dir = FileManager.default.temporaryDirectory
+      .appendingPathComponent("system-player", isDirectory: true)
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    let link = dir.appendingPathComponent(UUID().uuidString + ".mp4")
+    try FileManager.default.createSymbolicLink(at: link, withDestinationURL: url)
+    return AVURLAsset(url: link)
+  }
+
+  /// The first 1 MB holds ftyp + moov.
+  private static func head(_ url: URL) -> [UInt8] {
+    guard let handle = try? FileHandle(forReadingFrom: url) else { return [] }
+    defer { try? handle.close() }
+    return [UInt8](handle.readData(ofLength: 1 << 20))
+  }
+}

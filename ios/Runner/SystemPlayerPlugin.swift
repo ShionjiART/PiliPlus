@@ -169,9 +169,19 @@ final class SystemPlayerSession: NSObject {
     let startMs = args["startMs"] as? Int ?? 0
     loadTask = Task { @MainActor in
       do {
-        let (asset, loader, videoInfo, audioInfo) =
-          try await SystemPlayerPlaylistLoader.makeAsset(
-            video: video, audio: audio, frameRate: frameRate, headers: headers)
+        let asset: AVAsset
+        let loader: SystemPlayerPlaylistLoader?
+        let videoInfo: SystemPlayerHLS.TrackInfo
+        let audioInfo: SystemPlayerHLS.TrackInfo?
+        if video.url.isFileURL {
+          (asset, videoInfo, audioInfo) = try await SystemPlayerLocal.makeAsset(
+            video: video.url, audio: audio?.url)
+          loader = nil
+        } else {
+          (asset, loader, videoInfo, audioInfo) =
+            try await SystemPlayerPlaylistLoader.makeAsset(
+              video: video, audio: audio, frameRate: frameRate, headers: headers)
+        }
         if Task.isCancelled { return }
         self.loader = loader
         self.videoInfo = videoInfo
