@@ -50,7 +50,7 @@ Future<bool> _confirmSystemPlayerAll(BuildContext context, bool value) async {
         '这是实验性功能。\n\n'
         '影响范围\n'
         '· 所有点播视频（普通视频、番剧、课程等）改用 iOS 系统播放器播放\n'
-        '· 直播、已缓存的离线视频和「听视频」仍使用内置播放器\n'
+        '· 直播、「听视频」和已缓存的非 HDR 视频仍使用内置播放器\n'
         '· 部分 HEVC 视频，以及设备不支持 AV1 硬解时的 AV1 视频，仍使用内置播放器\n\n'
         '可能的后果\n'
         '· 超分辨率不可用\n'

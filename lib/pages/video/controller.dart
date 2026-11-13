@@ -83,6 +83,7 @@ import 'package:get/get.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:media_kit/media_kit.dart' hide Subtitle;
+import 'package:path/path.dart' as path;
 
 typedef SubtitleData = ({bool isData, String id});
 
@@ -730,22 +731,23 @@ class VideoDetailController extends GetxController
 
   static final Map<String, bool> _hwDecodeSupport = {};
 
+  static const _hdrQualities = {
+    125, // HDR 真彩
+    126, // 杜比视界
+    129, // HDR Vivid
+  };
+
   /// iOS: play with the system player (AVPlayer) instead of mpv when the
   /// settings ask for it. mpv only outputs SDR on iOS, so HDR / Dolby Vision
   /// look wrong there. Returns null to keep mpv.
   Future<SystemPlayerSource?> _systemPlayerSource() async {
-    if (!SystemPlayer.isSupported ||
-        isFileSource ||
-        plPlayerController.onlyPlayAudio.value) {
+    if (!SystemPlayer.isSupported || plPlayerController.onlyPlayAudio.value) {
       return null;
     }
+    if (isFileSource) return _localSystemPlayerSource();
     final codecs = firstVideo.codecs ?? '';
     final isHdr =
-        const {
-          125, // HDR 真彩
-          126, // 杜比视界
-          129, // HDR Vivid
-        }.contains(firstVideo.quality.code) ||
+        _hdrQualities.contains(firstVideo.quality.code) ||
         codecs.startsWith('dvh1') ||
         codecs.startsWith('dvhe');
     if (!(Pref.systemPlayerAll || (isHdr && Pref.systemPlayerHdr))) {
@@ -795,6 +797,40 @@ class VideoDetailController extends GetxController
       video: video,
       audio: audio,
       frameRate: double.tryParse(firstVideo.frameRate ?? ''),
+    );
+  }
+
+  /// Offline: downloaded HDR / Dolby Vision videos are read straight from the
+  /// files by the system player, like online ones. Other downloads, and old
+  /// single-file MP4 downloads, stay on mpv.
+  Future<SystemPlayerSource?> _localSystemPlayerSource() async {
+    if (entry.mediaType == 1 ||
+        !_hdrQualities.contains(entry.preferedVideoQuality) ||
+        !(Pref.systemPlayerHdr || Pref.systemPlayerAll)) {
+      return null;
+    }
+    final dir = path.join(args['dirPath'] as String, entry.typeTag!);
+    final video = File(path.join(dir, PathUtils.videoNameType2));
+    final audio = entry.hasDashAudio
+        ? File(path.join(dir, PathUtils.audioNameType2))
+        : null;
+    if (!video.existsSync() || (audio != null && !audio.existsSync())) {
+      return null;
+    }
+    // AVPlayer has no software AV1 decoder. bilibili codecid 13 is AV1.
+    try {
+      final json = jsonDecode(
+        await File(path.join(dir, 'index.json')).readAsString(),
+      );
+      if ((json['video'] as List?)?.firstOrNull?['codecid'] == 13 &&
+          !(_hwDecodeSupport['av01'] ??=
+              await SystemPlayer.supportsHardwareDecode('av01'))) {
+        return null;
+      }
+    } catch (_) {}
+    return SystemPlayerSource(
+      video: SystemPlayerTrack.file(video.path),
+      audio: audio == null ? null : SystemPlayerTrack.file(audio.path),
     );
   }
 

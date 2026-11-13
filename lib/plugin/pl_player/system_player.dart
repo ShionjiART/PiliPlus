@@ -19,6 +19,14 @@ class SystemPlayerTrack {
   final int indexEnd;
   final int bandwidth;
 
+  /// A downloaded file. The native side opens it directly instead of building
+  /// an HLS playlist, so no segment index is needed.
+  factory SystemPlayerTrack.file(String path) => SystemPlayerTrack(
+    url: Uri.file(path).toString(),
+    indexEnd: 0,
+    bandwidth: 0,
+  );
+
   /// Returns null when the stream has no usable segment index.
   static SystemPlayerTrack? fromItem(BaseItem item, String url) {
     final range =
