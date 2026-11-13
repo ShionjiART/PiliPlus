@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:PiliPlus/common/assets.dart';
 import 'package:PiliPlus/common/constants.dart';
 import 'package:PiliPlus/common/style.dart';
@@ -63,6 +65,9 @@ class SavePanel extends StatefulWidget {
 }
 
 class _SavePanelState extends State<SavePanel> {
+  /// 保存图片的最大宽度，与常见直板 iPhone 相同（如 iPhone 17 Pro 为 402pt）
+  static const _maxImageWidth = 402.0;
+
   final boundaryKey = GlobalKey();
 
   bool showBottom = true;
@@ -351,7 +356,11 @@ class _SavePanelState extends State<SavePanel> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final padding = MediaQuery.viewPaddingOf(context);
-    final maxWidth = MediaQuery.sizeOf(context).shortestSide;
+    // 保存的图片和直板手机一样宽。折叠屏、平板的短边更宽，图片会显得过宽
+    final maxWidth = math.min(
+      MediaQuery.sizeOf(context).shortestSide,
+      _maxImageWidth,
+    );
     late final coverSize = MediaQuery.textScalerOf(context).scale(65);
 
     final Widget child;
