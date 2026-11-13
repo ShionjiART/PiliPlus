@@ -23,6 +23,7 @@
 - [x] 视频页偶尔右侧留出空白（时间和 Wi-Fi 没隐藏）：每次都和系统重新同步竖状态栏状态，回到前台时重新确认（[#18](https://github.com/ShionjiART/PiliPlus/pull/18)）
 - [x] 直接打开的页面也避开竖状态栏，修复通讯录页标签栏伸到竖栏下面（[#4](https://github.com/ShionjiART/PiliPlus/pull/4)）
 - [x] 修复开启「改用侧边栏」后首页搜索栏和头像消失：iOS 26 起的 iPhone 由系统标签栏负责导航，这个设置不再生效并在设置里置灰（普通 iPhone 也适用）（[#19](https://github.com/ShionjiART/PiliPlus/pull/19)）
+- [x] 合上时二级页面在竖状态栏显示返回键，页面左上角的返回键保留；首页等一级页面和视频页不显示，弹窗不影响（[#21](https://github.com/ShionjiART/PiliPlus/pull/21)）
 - [ ] 移植 [@Stasert](https://github.com/Stasert) 的竖栏导航等功能，进度见 [#2](https://github.com/ShionjiART/PiliPlus/issues/2)
 
 ## 播放
