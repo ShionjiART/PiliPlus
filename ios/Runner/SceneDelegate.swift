@@ -118,6 +118,14 @@ final class NativeTabBarController: UITabBarController, UITabBarControllerDelega
       if let window = host?.view.window {
         insets.top = min(insets.top, window.safeAreaInsets.top)
       }
+      // iPhone Duo: while the status bar sits in the vertical bar on the side,
+      // nothing is shown at the top edge, but a real device can still report a
+      // top inset (about 20pt; the simulator reports 0), which left an empty
+      // strip above every page. Normal iPhones in landscape have at most about
+      // 62pt on the Dynamic Island side, so 72 only matches the vertical bar.
+      if max(insets.left, insets.right) >= 72 {
+        insets.top = 0
+      }
       guard insets != self.safeArea else { return }
       self.safeArea = insets
       self.channel?.invokeMethod("safeArea", arguments: Self.encode(insets))
