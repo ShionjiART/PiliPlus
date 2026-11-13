@@ -75,7 +75,7 @@ class _MatchInfoPageState extends CommonDynPageState<MatchInfoPage> {
 
   @override
   void replyReply(BuildContext context, ReplyInfo replyItem, int? id) {
-    Get.to(
+    Get.toSafe(
       SimpleScaffold(
         appBar: AppBar(
           title: const Text('评论详情'),

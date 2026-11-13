@@ -43,6 +43,7 @@ import 'package:PiliPlus/utils/num_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:extended_nested_scroll_view/extended_nested_scroll_view.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -468,7 +469,7 @@ class _MemberPageState extends State<MemberPage> {
                 ),
               ),
             PopupMenuItem(
-              onTap: () => Get.to(const LoginDevicesPage()),
+              onTap: () => Get.toSafe(const LoginDevicesPage()),
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -479,7 +480,7 @@ class _MemberPageState extends State<MemberPage> {
               ),
             ),
             PopupMenuItem(
-              onTap: () => Get.to(
+              onTap: () => Get.toSafe(
                 const LogPage(),
                 arguments: LoginLogController(),
               ),
@@ -493,7 +494,7 @@ class _MemberPageState extends State<MemberPage> {
               ),
             ),
             PopupMenuItem(
-              onTap: () => Get.to(
+              onTap: () => Get.toSafe(
                 const LogPage(),
                 arguments: CoinLogController(),
               ),
@@ -507,7 +508,7 @@ class _MemberPageState extends State<MemberPage> {
               ),
             ),
             PopupMenuItem(
-              onTap: () => Get.to(
+              onTap: () => Get.toSafe(
                 const LogPage(),
                 arguments: ExpLogController(),
               ),

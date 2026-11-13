@@ -281,7 +281,7 @@ class MainController extends GetxController
     if (_mineIndex != -1) {
       setIndex(_mineIndex!);
     } else {
-      Get.to(
+      Get.toSafe(
         const Material(
           child: ViewSafeArea(
             top: true,

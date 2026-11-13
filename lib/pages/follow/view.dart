@@ -16,6 +16,7 @@ import 'package:PiliPlus/utils/parse_int.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/request_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:flutter/services.dart' show LengthLimitingTextInputFormatter;
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
@@ -111,7 +112,7 @@ class _FollowPageState extends State<FollowPage>
                 if (_followController.followState.value is! Success) {
                   return;
                 }
-                Get.to(FollowTagSortPage(controller: _followController));
+                Get.toSafe(FollowTagSortPage(controller: _followController));
               },
               icon: const Icon(Icons.sort),
               tooltip: '分组排序',

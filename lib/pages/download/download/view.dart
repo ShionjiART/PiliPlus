@@ -17,6 +17,7 @@ import 'package:PiliPlus/services/download/download_service.dart';
 import 'package:PiliPlus/utils/extension/iterable_ext.dart';
 import 'package:PiliPlus/utils/grid.dart';
 import 'package:PiliPlus/utils/storage.dart';
+import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
@@ -182,7 +183,7 @@ class _DownloadPageState extends State<DownloadPage>
                   onPressed: () async {
                     await downloadService.waitForInitialization;
                     if (!mounted) return;
-                    Get.to(DownloadSearchPage(progress: _progress));
+                    Get.toSafe(DownloadSearchPage(progress: _progress));
                   },
                   icon: const Icon(Icons.search),
                 ),
