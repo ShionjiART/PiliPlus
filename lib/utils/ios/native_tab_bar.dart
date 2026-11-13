@@ -2,6 +2,7 @@ import 'dart:io' show Platform;
 import 'dart:math' show max;
 
 import 'package:PiliPlus/models/common/nav_bar_config.dart';
+import 'package:PiliPlus/utils/ios/foldable_helper.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
@@ -10,6 +11,14 @@ import 'package:flutter/widgets.dart';
 /// 原生层不可用时（系统版本过低、非 iPhone）[attach] 返回 false，
 /// 继续由 Flutter 绘制导航。
 abstract final class IOSNativeTabBar {
+  /// iOS 26 起，iPhone 的主导航由系统标签栏负责（iPhone Duo 上放在竖状态栏
+  /// 里），与 SceneDelegate 创建原生标签栏的条件一致。需要至少两个导航项才会
+  /// 真正接管，见 [attach]
+  static bool get isAvailable =>
+      Platform.isIOS &&
+      IOSFoldableHelper.isIPhone &&
+      IOSFoldableHelper.systemMajorVersion >= 26;
+
   static const _channel = MethodChannel('piliplus/native_tab_bar');
 
   static bool _enabled = false;

@@ -98,12 +98,16 @@ List<SettingsModel> get styleSettings => [
       defaultVal: Pref.horizontalScreen,
       onChanged: _onHorizontalScreenChanged,
     ),
-  const SwitchModel(
+  SwitchModel(
     title: '改用侧边栏',
     subtitle: '开启后底栏与顶栏被替换，且相关设置失效',
-    leading: Icon(Icons.chrome_reader_mode_outlined),
+    leading: const Icon(Icons.chrome_reader_mode_outlined),
     setKey: SettingBoxKey.useSideBar,
     defaultVal: false,
+    // 系统标签栏接管导航时侧边栏出不来，开启只会让首页搜索栏消失
+    lockedOffReason: Get.find<MainController>().nativeTabBarTakesOver
+        ? '此设备由系统标签栏负责导航，不能改用侧边栏'
+        : null,
     needReboot: true,
   ),
   const SwitchModel(

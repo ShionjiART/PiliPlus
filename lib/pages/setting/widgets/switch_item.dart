@@ -20,6 +20,10 @@ class SetSwitchItem extends StatefulWidget {
   /// While this other boolean setting is on, the switch shows on and is
   /// disabled (its own value is not changed).
   final String? lockedOnBy;
+
+  /// When set, the switch shows off and is disabled (its own value is not
+  /// changed), and this text replaces the subtitle to say why.
+  final String? lockedOffReason;
   final bool needReboot;
   final Widget? leading;
   final void Function(BuildContext context)? onTap;
@@ -36,6 +40,7 @@ class SetSwitchItem extends StatefulWidget {
     this.onChanged,
     this.confirmChange,
     this.lockedOnBy,
+    this.lockedOffReason,
     this.needReboot = false,
     this.leading,
     this.onTap,
@@ -118,7 +123,9 @@ class _SetSwitchItemState extends State<SetSwitchItem> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final locked = _locked;
+    final lockedOff = widget.lockedOffReason != null;
+    final locked = _locked || lockedOff;
+    final subtitle = widget.lockedOffReason ?? widget.subtitle;
     final titleStyle =
         widget.titleStyle ??
         theme.textTheme.titleMedium!.copyWith(
@@ -136,7 +143,7 @@ class _SetSwitchItemState extends State<SetSwitchItem> {
       scale: 0.8,
       alignment: .centerRight,
       child: Switch(
-        value: locked || val,
+        value: !lockedOff && (locked || val),
         onChanged: locked ? null : switchChange,
       ),
     );
@@ -146,9 +153,7 @@ class _SetSwitchItemState extends State<SetSwitchItem> {
       enabled: !locked && (widget.onTap == null || val),
       onTap: widget.onTap == null ? switchChange : () => widget.onTap!(context),
       title: Text(widget.title, style: titleStyle),
-      subtitle: widget.subtitle != null
-          ? Text(widget.subtitle!, style: subTitleStyle)
-          : null,
+      subtitle: subtitle != null ? Text(subtitle, style: subTitleStyle) : null,
       leading: widget.leading,
       trailing: trailing,
     );

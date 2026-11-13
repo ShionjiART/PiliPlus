@@ -29,6 +29,11 @@ abstract final class IOSFoldableHelper {
   /// 当前设备是否为 iPhone（不含 iPad）
   static bool get isIPhone => _isIPhone;
 
+  static int _systemMajorVersion = 0;
+
+  /// iOS 主版本号，未知时为 0
+  static int get systemMajorVersion => _systemMajorVersion;
+
   @visibleForTesting
   static set debugIsIPhone(bool value) => _isIPhone = value;
 
@@ -52,6 +57,8 @@ abstract final class IOSFoldableHelper {
     try {
       final info = await DeviceInfoPlugin().iosInfo;
       _isIPhone = info.model.toLowerCase().contains('iphone');
+      _systemMajorVersion =
+          int.tryParse(info.systemVersion.split('.').first) ?? 0;
     } catch (e) {
       if (kDebugMode) debugPrint('IOSFoldableHelper init: $e');
     }
