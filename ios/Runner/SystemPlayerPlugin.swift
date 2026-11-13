@@ -145,6 +145,9 @@ final class SystemPlayerSession: NSObject {
     self.emit = emit
     super.init()
     player.automaticallyWaitsToMinimizeStalling = true
+    // Receivers cannot load the custom-scheme playlists; AirPlay casting has
+    // its own entry on the cast page (AirPlayPlugin).
+    player.allowsExternalPlayback = false
     player.appliesMediaSelectionCriteriaAutomatically = true
     timeObserver = player.addPeriodicTimeObserver(
       forInterval: CMTime(value: 1, timescale: 5), queue: .main
