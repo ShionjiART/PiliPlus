@@ -121,8 +121,10 @@ void main() async {
     if (Platform.isAndroid) MaxScreenSize.init();
     if (Platform.isIOS) {
       await IOSFoldableHelper.init();
-      // iPhone Duo 竖状态栏里的返回键，和页面左上角的返回键、Esc 键走同一套逻辑
+      // iPhone Duo 竖状态栏里的返回键，和 Esc 键走同一套逻辑
       IOSNativeTabBar.onBack = () async => _onBack();
+      // 竖状态栏里有返回键时，页面左上角不再重复显示
+      AppBar.hideImpliedBackButton = IOSNativeTabBar.hidesPageBackButton;
     }
     await Future.wait([
       if (Pref.horizontalScreen) ?fullMode() else ?portraitUpMode(),
@@ -339,9 +341,12 @@ class MyApp extends StatelessWidget {
     final uiScale = Pref.uiScale;
     final mediaQuery = MediaQuery.of(context);
     final textScaler = TextScaler.linear(Pref.defaultTextScale);
-    if (Platform.isIOS && tmpPadding == null) {
-      // 放在下面的 MediaQuery 之内，以覆盖它的内边距
-      child = NativeSafeArea(scale: uiScale, child: child!);
+    if (Platform.isIOS) {
+      if (tmpPadding == null) {
+        // 放在下面的 MediaQuery 之内，以覆盖它的内边距
+        child = NativeSafeArea(scale: uiScale, child: child!);
+      }
+      child = NativeBackScope(child: child!);
     }
     if (uiScale != 1.0) {
       child = MediaQuery(

@@ -50,6 +50,9 @@ class SceneDelegate: FlutterSceneDelegate {
           navigation.onToolsShownChange = { [weak tabs] shown in
             tabs?.publishToolsShown(shown)
           }
+          navigation.onBackAvailableChange = { [weak tabs] available in
+            tabs?.publishBackAvailable(available)
+          }
           root = navigation
         }
       #endif
@@ -145,6 +148,8 @@ final class NativeTabBarController: UITabBarController, UITabBarControllerDelega
       result(nil)
     case "getSafeArea":
       result(Self.encode(safeArea))
+    case "getBackAvailable":
+      result(navigationHost?.backAvailable ?? false)
     case "setTabs":
       guard let args = call.arguments as? [String: Any],
         let tabs = args["tabs"] as? [[String: String]], tabs.count > 1
@@ -205,6 +210,10 @@ final class NativeTabBarController: UITabBarController, UITabBarControllerDelega
 
   func publishToolsShown(_ shown: Bool) {
     channel?.invokeMethod("toolsShown", arguments: shown)
+  }
+
+  func publishBackAvailable(_ available: Bool) {
+    channel?.invokeMethod("backAvailable", arguments: available)
   }
 
   private func select(_ index: Int) {
@@ -345,9 +354,9 @@ private final class RailPressButton: UIButton {
 
 /// iPhone Duo: wraps the tabs so pages can put their own buttons in the
 /// vertical bar through the navigation bar, which UIKit moves into the vertical
-/// bar. For now that is a back button on secondary pages; the in-page back
-/// buttons stay. The bars are hidden on devices without a vertical bar and
-/// while a page hides the vertical bar (the video page).
+/// bar: a back button on secondary pages, which replaces the back button
+/// Flutter's app bars would add. The bars are hidden on devices without a
+/// vertical bar and while a page hides the vertical bar (the video page).
 ///
 /// Dart decides which page is on top and whether it can go back
 /// (`setNavigationState`); taps go back to Dart, so this controller never
@@ -361,6 +370,11 @@ final class NativePageNavigationController: UINavigationController {
   /// Whether the vertical bar has the tools, so the page can drop its own
   /// copy (the home page's avatar).
   var onToolsShownChange: ((Bool) -> Void)?
+  /// Whether secondary pages get the back button in the vertical bar, so
+  /// their app bars leave theirs out. Follows the vertical bar only, not the
+  /// video page hiding it: pages under the video page keep their layout.
+  var onBackAvailableChange: ((Bool) -> Void)?
+  private(set) var backAvailable = false
 
   // Search, notifications and the avatar: shown at the top of the vertical bar
   // on root pages, where secondary pages show the back button.
@@ -606,6 +620,10 @@ final class NativePageNavigationController: UINavigationController {
     if toolsAvailable != toolsShown {
       toolsShown = toolsAvailable
       onToolsShownChange?(toolsAvailable)
+    }
+    if hasVerticalBar != backAvailable {
+      backAvailable = hasVerticalBar
+      onBackAvailableChange?(hasVerticalBar)
     }
   }
 
