@@ -50,6 +50,7 @@ import 'package:PiliPlus/plugin/pl_player/widgets/forward_seek.dart';
 import 'package:PiliPlus/plugin/pl_player/widgets/mpv_convert_webp.dart';
 import 'package:PiliPlus/plugin/pl_player/widgets/play_pause_btn.dart';
 import 'package:PiliPlus/plugin/pl_player/widgets/system_player_video.dart';
+import 'package:PiliPlus/plugin/pl_player/widgets/system_subtitle_view.dart';
 import 'package:PiliPlus/utils/android/bindings.g.dart';
 import 'package:PiliPlus/utils/cache_manager.dart';
 import 'package:PiliPlus/utils/connectivity_utils.dart';
@@ -1345,10 +1346,16 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
             child: IgnorePointer(
               ignoring: !plPlayerController.enableDragSubtitle,
               child: Obx(
-                // TODO(system player): subtitles (AVPlayer does not feed
-                // media_kit's subtitle stream).
+                // AVPlayer does not feed media_kit's subtitle stream, so the
+                // system player's subtitles are timed in Flutter.
                 () => plPlayerController.usingSystemPlayer.value
-                    ? const SizedBox.shrink()
+                    ? SystemSubtitleView(
+                        text: plPlayerController.systemSubtitle,
+                        configuration: plPlayerController.subtitleConfig.value,
+                        enableDragSubtitle:
+                            plPlayerController.enableDragSubtitle,
+                        onUpdatePadding: plPlayerController.onUpdatePadding,
+                      )
                     : SubtitleView(
                         controller: videoController,
                         configuration: plPlayerController.subtitleConfig.value,

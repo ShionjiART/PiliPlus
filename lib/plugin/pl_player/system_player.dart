@@ -161,6 +161,10 @@ class SystemPlayer {
   Future<void> setVolume(double volume) =>
       _channel.invokeMethod('setVolume', {'id': id, 'volume': volume});
 
+  /// The current frame as PNG (HDR tone mapped to SDR), or null.
+  Future<Uint8List?> screenshot() =>
+      _channel.invokeMethod<Uint8List>('screenshot', {'id': id});
+
   /// Details for the playback info panel (see `SystemPlayerSession.info`).
   Future<Map<String, Object?>> info() async =>
       (await _channel.invokeMapMethod<String, Object?>('info', {'id': id})) ??

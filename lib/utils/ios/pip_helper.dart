@@ -81,6 +81,16 @@ abstract final class IOSPipHelper {
     });
   }
 
+  /// Enters PiP with the iOS system player's own layer (see
+  /// `PlayerLayerPipSession` in PipPlugin.swift); AVKit controls the player.
+  static void enterPlayer(int playerId, {required bool autoEnter}) {
+    if (autoEnter) _autoEnter = true;
+    _channel.invokeMethod('enterPlayer', {
+      'playerId': playerId,
+      'autoEnter': autoEnter,
+    });
+  }
+
   static void update(Map<String, Object> state) {
     _channel.invokeMethod('update', state);
   }

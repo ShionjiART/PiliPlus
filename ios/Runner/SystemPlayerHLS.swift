@@ -40,6 +40,8 @@ enum SystemPlayerHLS {
     var videoRange: String?  // SDR / PQ / HLG
     var width = 0
     var height = 0
+    /// Transfer characteristics in the HEVC SPS (16 PQ, 18 HLG), if any.
+    var spsTransfer: Int?
   }
 
   /// Fetches `[0, track.indexEnd]` and parses ftyp/moov/sidx.
@@ -103,6 +105,8 @@ enum SystemPlayerHLS {
 
   private static func trackInfo(_ b: [UInt8], _ start: Int, _ end: Int) -> TrackInfo {
     var info = TrackInfo()
+    var colrRange: String?
+    var dolbyRange: String?
     func u16(_ i: Int) -> Int { Int(b[i]) << 8 | Int(b[i + 1]) }
     func u32(_ i: Int) -> Int { u16(i) << 16 | u16(i + 2) }
     func hex(_ v: Int) -> String { String(v, radix: 16, uppercase: true) }
@@ -146,6 +150,7 @@ enum SystemPlayerHLS {
           for c in constraints { s += "." + hex(c) }
           // A dvh1/dvhe entry (profile 5) keeps its Dolby Vision string.
           if info.codecs?.hasPrefix("dv") != true { info.codecs = s }
+          info.spsTransfer = SystemPlayerHEVC.transfer(hvcC: b, body: body, end: i + size)
         case "avcC":
           info.codecs = String(format: "avc1.%02X%02X%02X", b[body + 1], b[body + 2], b[body + 3])
         case "av1C":
@@ -161,19 +166,18 @@ enum SystemPlayerHLS {
           let dv = String(format: "dvh1.%02d.%02d", profile, level)
           if info.codecs?.hasPrefix("dv") == true {
             info.codecs = dv  // profile 5: Dolby Vision only
-            info.videoRange = "PQ"
+            dolbyRange = "PQ"
           } else {
             // Profile 8.x: HEVC base layer, Dolby Vision as a supplement.
             let brand = [1: "db1p", 2: "db2g", 4: "db4h"][compat]
             info.supplementalCodecs = brand.map { "\(dv)/\($0)" } ?? dv
+            // The base layer's range follows from the compatibility id;
+            // bilibili's DV streams have no `colr` box to read it from.
+            dolbyRange = [1: "PQ", 2: "SDR", 4: "HLG", 6: "PQ"][compat]
           }
         case "colr":
-          if String(bytes: b[body..<(body + 4)], encoding: .ascii) == "nclx", info.videoRange == nil {
-            switch u16(body + 6) {
-            case 16: info.videoRange = "PQ"
-            case 18: info.videoRange = "HLG"
-            default: info.videoRange = "SDR"
-            }
+          if String(bytes: b[body..<(body + 4)], encoding: .ascii) == "nclx" {
+            colrRange = range(transfer: u16(body + 6))
           }
         case "esds":
           // ES_Descriptor > DecoderConfigDescriptor > DecoderSpecificInfo
@@ -210,8 +214,21 @@ enum SystemPlayerHLS {
       }
     }
     walk(start, end)
-    if info.width > 0, info.videoRange == nil { info.videoRange = "SDR" }
+    if info.width > 0 {
+      // AVPlayer checks VIDEO-RANGE against the bitstream, so the SPS wins;
+      // bilibili's DV and some HDR streams have no `colr` box.
+      info.videoRange =
+        info.spsTransfer.map(range(transfer:)) ?? colrRange ?? dolbyRange ?? "SDR"
+    }
     return info
+  }
+
+  private static func range(transfer: Int) -> String {
+    switch transfer {
+    case 16: return "PQ"
+    case 18: return "HLG"
+    default: return "SDR"
+    }
   }
 
   static func mediaPlaylist(_ media: Media, url: URL) -> String {
