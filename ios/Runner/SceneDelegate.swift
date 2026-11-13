@@ -27,8 +27,27 @@ class SceneDelegate: FlutterSceneDelegate {
       let window,
       let flutterViewController = window.rootViewController as? FlutterViewController
     {
-      window.rootViewController = NativeTabBarController(
-        flutterViewController: flutterViewController)
+      let tabs = NativeTabBarController(flutterViewController: flutterViewController)
+      var root: UIViewController = tabs
+      // iPhone Duo (iOS 27.1 SDK): a navigation controller around the tabs lets
+      // pages put their own buttons, such as back, in the vertical bar. Its
+      // bars stay hidden on devices without a vertical bar.
+      #if compiler(>=6.4)
+        if #available(iOS 27.1, *) {
+          let navigation = NativePageNavigationController(rootViewController: tabs)
+          navigation.onBack = { [weak tabs] completion in
+            tabs?.requestBack(completion: completion)
+          }
+          navigation.onPageAction = { [weak tabs] owner, id, completion in
+            tabs?.requestPageAction(owner: owner, id: id, completion: completion)
+          }
+          navigation.onVisibilityChange = { [weak tabs] back, actions in
+            tabs?.publishBarVisibility(back: back, actions: actions)
+          }
+          root = navigation
+        }
+      #endif
+      window.rootViewController = root
     }
   }
 }
@@ -60,10 +79,37 @@ final class NativeTabBarController: UITabBarController, UITabBarControllerDelega
 
   private var safeArea = UIEdgeInsets.zero
 
+  private var navigationHost: NativePageNavigationController? {
+    navigationController as? NativePageNavigationController
+  }
+
+  func requestBack(completion: @escaping () -> Void) {
+    channel?.invokeMethod("back", arguments: nil) { _ in completion() }
+  }
+
+  func requestPageAction(owner: Int, id: String, completion: @escaping () -> Void) {
+    channel?.invokeMethod("pageAction", arguments: ["owner": owner, "id": id]) { _ in
+      completion()
+    }
+  }
+
+  func publishBarVisibility(back: Bool, actions: Bool) {
+    channel?.invokeMethod("backButtonVisible", arguments: back)
+    channel?.invokeMethod("pageActionsVisible", arguments: actions)
+  }
+
   private func makeHost() -> FlutterHostViewController {
     let host = FlutterHostViewController()
-    host.onSafeAreaChange = { [weak self] insets in
-      guard let self, insets != self.safeArea else { return }
+    host.onSafeAreaChange = { [weak self, weak host] insets in
+      guard let self else { return }
+      var insets = insets
+      // iPhone Duo: UIKit moves the navigation bar into the vertical bar but
+      // still adds its height to the top safe area. Nothing is drawn there, so
+      // keep the window's own top inset and the page does not move down.
+      if let window = host?.view.window {
+        insets.top = min(insets.top, window.safeAreaInsets.top)
+      }
+      guard insets != self.safeArea else { return }
       self.safeArea = insets
       self.channel?.invokeMethod("safeArea", arguments: Self.encode(insets))
     }
@@ -79,8 +125,18 @@ final class NativeTabBarController: UITabBarController, UITabBarControllerDelega
 
   required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-  private func handle(_ call: FlutterMethodCall, result: FlutterResult) {
+  private func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     switch call.method {
+    case "setNavigationState":
+      // The top page, whether it can go back, and its buttons; sent by Dart
+      // once per frame after route changes.
+      if let page = (call.arguments as? [String: Any])?["page"] as? [String: Any] {
+        navigationHost?.setPage(
+          owner: page["owner"] as? Int ?? 0,
+          items: page["items"] as? [[String: Any]] ?? [],
+          canGoBack: page["canGoBack"] as? Bool ?? false)
+      }
+      result(nil)
     case "getSafeArea":
       result(Self.encode(safeArea))
     case "setTabs":
@@ -176,6 +232,9 @@ final class NativeTabBarController: UITabBarController, UITabBarControllerDelega
 
   private func verticalBarDidChange() {
     UIView.animate(withDuration: 0.25) { self.setNeedsStatusBarAppearanceUpdate() }
+    // Pages that hide the vertical bar (the video page) fill its space, so its
+    // buttons go away with it.
+    navigationHost?.setVerticalBarHidden(isVerticalBarHidden)
     if isVerticalBarHidden != sentVerticalBarHidden {
       sentVerticalBarHidden = isVerticalBarHidden
       channel?.invokeMethod("verticalBarHidden", arguments: isVerticalBarHidden)
@@ -241,6 +300,153 @@ final class NativeTabBarController: UITabBarController, UITabBarControllerDelega
   override func viewDidDisappear(_ animated: Bool) {
     super.viewDidDisappear(animated)
     flutterViewController.endAppearanceTransition()
+  }
+}
+
+/// iPhone Duo: wraps the tabs so pages can put their own buttons in the
+/// vertical bar through the navigation bar, which UIKit moves into the vertical
+/// bar. For now that is a back button on secondary pages; the in-page back
+/// buttons stay. The bars are hidden on devices without a vertical bar and
+/// while a page hides the vertical bar (the video page).
+///
+/// Dart decides which page is on top and whether it can go back
+/// (`setNavigationState`); taps go back to Dart, so this controller never
+/// pushes or pops view controllers itself.
+@available(iOS 26.0, *)
+final class NativePageNavigationController: UINavigationController {
+  var onBack: ((@escaping () -> Void) -> Void)?
+  var onPageAction: ((Int, String, @escaping () -> Void) -> Void)?
+  var onVisibilityChange: ((_ back: Bool, _ actions: Bool) -> Void)?
+
+  private var canGoBack = false
+  private var actionsOwner = 0
+  private var pageActions: [[String: Any]] = []
+  private var verticalBarHidden = false
+  private var backInFlight = false
+  private var barsVisible = false
+  private var backButtonVisible = false
+  private var actionsVisible = false
+  private var updatingBars = false
+  private var leadingSignature: [[ObjectIdentifier]] = []
+
+  private lazy var backItem: UIBarButtonItem = {
+    let item = UIBarButtonItem(
+      title: "返回", image: UIImage(systemName: "chevron.backward"),
+      primaryAction: UIAction { [weak self] _ in self?.requestBack() })
+    item.accessibilityLabel = "返回"
+    item.identifier = "piliplus.navigation.back"
+    return item
+  }()
+
+  override func viewDidLoad() {
+    super.viewDidLoad()
+    navigationBar.isTranslucent = true
+    setNavigationBarHidden(true, animated: false)
+    setToolbarHidden(true, animated: false)
+    // There is only ever one view controller; Flutter handles edge swipes.
+    interactivePopGestureRecognizer?.isEnabled = false
+    // The vertical bar edge is a trait, and a trait change need not come with
+    // a layout pass, so the bars would keep their old state after folding or
+    // unfolding.
+    #if compiler(>=6.4)
+      if #available(iOS 27.1, *) {
+        registerForTraitChanges(UITraitCollection.systemTraitsAffectingVerticalBarEdge) {
+          (self: NativePageNavigationController, _) in
+          self.updateBars()
+        }
+      }
+    #endif
+  }
+
+  override func viewDidLayoutSubviews() {
+    super.viewDidLayoutSubviews()
+    updateBars()
+  }
+
+  func setPage(owner: Int, items: [[String: Any]], canGoBack: Bool) {
+    actionsOwner = owner
+    pageActions = items
+    self.canGoBack = canGoBack
+    updateBars()
+  }
+
+  func setVerticalBarHidden(_ hidden: Bool) {
+    guard hidden != verticalBarHidden else { return }
+    verticalBarHidden = hidden
+    updateBars()
+  }
+
+  private var hasVerticalBar: Bool {
+    #if compiler(>=6.4)
+      if #available(iOS 27.1, *) {
+        return traitCollection.verticalBarEdge != .unspecified
+      }
+    #endif
+    return false
+  }
+
+  private func updateBars() {
+    guard !updatingBars, isViewLoaded, let content = topViewController else { return }
+    updatingBars = true
+    defer { updatingBars = false }
+
+    let visible = hasVerticalBar && !verticalBarHidden
+    let showsBack = visible && canGoBack
+    let leadingItems: [[UIBarButtonItem]] = showsBack ? [[backItem]] : []
+    let signature = leadingItems.map { $0.map(ObjectIdentifier.init) }
+    // UIKit rebuilds the navigation bar, and drops these groups, when the
+    // scene moves between the inner and outer display, so compare with what it
+    // actually holds rather than only with what was last set.
+    let realized = content.navigationItem.leadingItemGroups.map {
+      $0.barButtonItems.map(ObjectIdentifier.init)
+    }
+    if signature != leadingSignature || realized != signature {
+      leadingSignature = signature
+      content.navigationItem.hidesBackButton = true
+      content.navigationItem.leadingItemGroups = leadingItems.map {
+        .fixedGroup(representativeItem: nil, items: $0)
+      }
+      #if compiler(>=6.4)
+        if #available(iOS 27.1, *) {
+          content.navigationItem.verticalBarCompressionBehavior = .prefersBarItems
+        }
+      #endif
+    }
+
+    // Keep the navigation bar shown on every page while there is a vertical
+    // bar, so pushing and popping does not change the safe area.
+    if isNavigationBarHidden == visible {
+      let animate = view.window != nil && !UIAccessibility.isReduceMotionEnabled
+      setNavigationBarHidden(!visible, animated: animate)
+    }
+    let showsActions = false
+    let changed = showsBack != backButtonVisible || showsActions != actionsVisible
+    barsVisible = visible
+    backButtonVisible = showsBack
+    actionsVisible = showsActions
+    if changed { onVisibilityChange?(showsBack, showsActions) }
+  }
+
+  private func requestBack() {
+    guard barsVisible, canGoBack, !backInFlight else { return }
+    // One back per tap, even if UIKit delivers the tap twice or the user taps
+    // again while the page is leaving.
+    backInFlight = true
+    onBack? { [weak self] in
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+        self?.backInFlight = false
+      }
+    }
+  }
+
+  override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
+    topViewController?.supportedInterfaceOrientations ?? super.supportedInterfaceOrientations
+  }
+  override var childForStatusBarStyle: UIViewController? { topViewController }
+  override var childForStatusBarHidden: UIViewController? { topViewController }
+  override var childForHomeIndicatorAutoHidden: UIViewController? { topViewController }
+  override var childForScreenEdgesDeferringSystemGestures: UIViewController? {
+    topViewController
   }
 }
 

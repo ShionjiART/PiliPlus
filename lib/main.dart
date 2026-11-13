@@ -119,7 +119,11 @@ void main() async {
 
   if (PlatformUtils.isMobile) {
     if (Platform.isAndroid) MaxScreenSize.init();
-    if (Platform.isIOS) await IOSFoldableHelper.init();
+    if (Platform.isIOS) {
+      await IOSFoldableHelper.init();
+      // iPhone Duo 竖状态栏里的返回键，和页面左上角的返回键、Esc 键走同一套逻辑
+      IOSNativeTabBar.onBack = () async => _onBack();
+    }
     await Future.wait([
       if (Pref.horizontalScreen) ?fullMode() else ?portraitUpMode(),
       setupServiceLocator(),
@@ -323,6 +327,7 @@ class MyApp extends StatelessWidget {
       navigatorObservers: [
         routeObserver,
         FlutterSmartDialog.observer,
+        if (Platform.isIOS) IOSNativeTabBar.navigationObserver,
       ],
       scrollBehavior: PlatformUtils.isDesktop
           ? const CustomScrollBehavior()

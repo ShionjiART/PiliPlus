@@ -1,8 +1,12 @@
+import 'dart:async' show scheduleMicrotask;
 import 'dart:io' show Platform;
 import 'dart:math' show max;
 
 import 'package:PiliPlus/models/common/nav_bar_config.dart';
 import 'package:PiliPlus/utils/ios/foldable_helper.dart';
+import 'package:PiliPlus/utils/ios/native_navigation_batch.dart';
+import 'package:PiliPlus/utils/ios/native_navigation_observer.dart';
+import 'package:PiliPlus/utils/ios/native_page_actions.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
@@ -40,6 +44,18 @@ abstract final class IOSNativeTabBar {
           _setSafeArea(call.arguments);
         case 'verticalBarHidden':
           verticalBarHidden.value = call.arguments as bool;
+        case 'back':
+          await onBack?.call();
+        case 'backButtonVisible':
+          backButtonVisible.value = call.arguments as bool;
+        case 'pageAction':
+          final args = Map<Object?, Object?>.from(call.arguments as Map);
+          await _pageActions.handle(
+            owner: args['owner'] as int,
+            id: args['id'] as String,
+          );
+        case 'pageActionsVisible':
+          pageActionsVisible.value = call.arguments as bool;
       }
     });
     try {
@@ -120,6 +136,60 @@ abstract final class IOSNativeTabBar {
           },
         );
   }
+
+  // ---------------------------------------------------------------------------
+  // 竖状态栏里的页面按钮（iPhone Duo）：二级页面的返回键，以及页面自己注册的按钮。
+  // 原生层只在有竖状态栏、且它没被隐藏时显示这些按钮；其他设备上不显示。
+  // 页面里原有的返回键等不受影响。
+
+  /// 点击竖状态栏里的返回键
+  static Future<void> Function()? onBack;
+
+  /// 竖状态栏里当前是否显示返回键（由原生层告知）
+  static final backButtonVisible = ValueNotifier(false);
+
+  /// 竖状态栏里当前是否显示页面按钮（由原生层告知）
+  static final pageActionsVisible = ValueNotifier(false);
+
+  static bool _canGoBack = false;
+
+  /// 加到根 Navigator 的 navigatorObservers 上，跟踪当前最上层的页面
+  static final navigationObserver = NativeNavigationObserver(
+    onCanGoBackChanged: (value) => _canGoBack = value,
+    onTopRouteChanged: _pageActions.setTopPage,
+  );
+
+  static final _pageActions = NativePageActionRegistry(
+    onChanged: (state) =>
+        _navigationBatch.submit('page', {...state, 'canGoBack': _canGoBack}),
+  );
+
+  /// 注册 [route] 页面在竖状态栏里的按钮，该页面在最上层时显示
+  static void setPageActions({
+    required Route<dynamic> route,
+    required List<NativePageAction> actions,
+    required NativePageActionHandler onAction,
+  }) => _pageActions.register(page: route, actions: actions, handler: onAction);
+
+  static void removePageActions(Route<dynamic> route) =>
+      _pageActions.unregister(route);
+
+  static final _navigationBatch = NativeNavigationBatch(
+    schedule: (flush) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => scheduleMicrotask(flush),
+      );
+      WidgetsBinding.instance.ensureVisualUpdate();
+    },
+    onChanged: (changes) {
+      if (!Platform.isIOS) return;
+      _channel.invokeMethod<void>('setNavigationState', changes).catchError(
+        (_) {
+          // 没有原生导航容器（iOS 27.1 以下或非 iPhone）
+        },
+      );
+    },
+  );
 }
 
 /// 用原生层转发的安全区覆盖 [MediaQuery] 的内边距
