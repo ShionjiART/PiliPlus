@@ -31,6 +31,10 @@
 - [x] 系统播放器支持画中画、截图和字幕（[#13](https://github.com/ShionjiART/PiliPlus/pull/13)）
 - [x] 修复部分 HDR 真彩、杜比视界视频无法用系统播放器播放，或在播放信息里显示成 SDR（[#13](https://github.com/ShionjiART/PiliPlus/pull/13)）
 
+## 离线缓存
+
+- [x] 修复网络不好时缓存「瞬间完成」但视频不完整：下载完核对文件大小，断了自动续传，续传多次仍不完整就标为失败；续传时换了视频流会从头下载（[#15](https://github.com/ShionjiART/PiliPlus/pull/15)）
+
 ## 投屏
 
 - [x] 修复 iOS 投屏一直「搜索设备失败」、不弹局域网授权（[#9](https://github.com/ShionjiART/PiliPlus/pull/9)）

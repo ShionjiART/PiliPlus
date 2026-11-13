@@ -30,7 +30,7 @@ import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/subtitle_utils.dart';
 import 'package:flutter/foundation.dart'
-    show kDebugMode, debugPrint, VoidCallback;
+    show kDebugMode, debugPrint, VoidCallback, visibleForTesting;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:path/path.dart' as path;
@@ -545,6 +545,7 @@ class DownloadService extends GetxService {
       }
 
       final mediaJsonFile = File(path.join(videoDir.path, _indexFile));
+      await _removeStalePartialFiles(mediaJsonFile, videoDir, mediaFileInfo);
       await Future.wait([
         mediaJsonFile.writeAsString(jsonEncode(mediaFileInfo.toJson())),
         _downloadCover(entry: entry),
@@ -599,6 +600,60 @@ class DownloadService extends GetxService {
         debugPrint('get download url error: $e');
       }
     }
+  }
+
+  /// 续传时重新获取的播放地址可能是另一条流（编码、音质或文件大小变了），
+  /// 这时已下载的部分不能接着用，否则会拼成一个损坏的文件。
+  static Future<void> _removeStalePartialFiles(
+    File mediaJsonFile,
+    Directory videoDir,
+    BiliDownloadMediaInfo newInfo,
+  ) async {
+    if (!mediaJsonFile.existsSync()) {
+      return;
+    }
+    BiliDownloadMediaInfo? oldInfo;
+    try {
+      final json = jsonDecode(await mediaJsonFile.readAsString());
+      oldInfo = switch (newInfo) {
+        Type1() => Type1.fromJson(json),
+        Type2() => Type2.fromJson(json),
+        _ => null,
+      };
+    } catch (_) {}
+    final (sameVideo, sameAudio) = isSameMediaStream(oldInfo, newInfo);
+    if (!sameVideo) {
+      await File(path.join(videoDir.path, PathUtils.videoNameType1)).tryDel();
+      await File(path.join(videoDir.path, PathUtils.videoNameType2)).tryDel();
+    }
+    if (!sameAudio) {
+      await File(path.join(videoDir.path, PathUtils.audioNameType2)).tryDel();
+    }
+  }
+
+  /// 返回 (视频是同一条流, 音频是同一条流)
+  @visibleForTesting
+  static (bool, bool) isSameMediaStream(
+    BiliDownloadMediaInfo? oldInfo,
+    BiliDownloadMediaInfo newInfo,
+  ) {
+    bool sameFile(Type2File? a, Type2File? b) =>
+        a?.id == b?.id &&
+        a?.codecid == b?.codecid &&
+        a?.bandwidth == b?.bandwidth;
+    return switch ((oldInfo, newInfo)) {
+      (Type1 a, Type1 b) => (
+        a.segmentList.firstOrNull?.bytes == b.segmentList.firstOrNull?.bytes &&
+            a.segmentList.firstOrNull?.order ==
+                b.segmentList.firstOrNull?.order,
+        true,
+      ),
+      (Type2 a, Type2 b) => (
+        sameFile(a.video.firstOrNull, b.video.firstOrNull),
+        sameFile(a.audio?.firstOrNull, b.audio?.firstOrNull),
+      ),
+      _ => (false, false),
+    };
   }
 
   Future<void> _updateBiliDownloadEntryJson(BiliDownloadEntryInfo entry) {
