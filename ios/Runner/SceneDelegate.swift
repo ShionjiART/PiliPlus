@@ -687,7 +687,9 @@ final class NativePageNavigationController: UINavigationController {
       button.isEnabled = enabled
       button.accessibilityLabel = "\(title)，\(count)"
       button.accessibilityTraits = selected ? [.button, .selected] : .button
-      let size = CGSize(width: 44, height: 56)
+      // Kept short: during a call the top of the vertical bar grows and the
+      // bar would move the lower buttons into a ⋯ menu.
+      let size = CGSize(width: 44, height: 48)
       button.frame = CGRect(origin: .zero, size: size)
       let container = UIView(frame: button.frame)
       container.addSubview(button)
