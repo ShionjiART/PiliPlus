@@ -16,6 +16,7 @@ import 'package:PiliPlus/common/widgets/scroll_behavior.dart'
 import 'package:PiliPlus/common/widgets/scroll_physics.dart'
     show ReloadScrollPhysics, platformAlwaysClampingPhysics;
 import 'package:PiliPlus/common/widgets/sliver/sliver_floating_header.dart';
+import 'package:PiliPlus/common/widgets/sliver/sliver_pinned_gap.dart';
 import 'package:PiliPlus/common/widgets/sliver/sliver_to_box_adapter.dart';
 import 'package:PiliPlus/common/widgets/tap_region_surface.dart';
 import 'package:PiliPlus/http/constants.dart';
@@ -60,6 +61,9 @@ class _DynamicDetailPageState extends CommonDynPageMultiState<DynamicDetailPage>
   late final DynamicDetailController controller;
   late final DynRepostController _repostController;
   late final DynLikeController _likeController;
+
+  /// 顶栏是否浮在内容上面，见 [build]
+  bool _floatingAppBar = false;
 
   late final RxBool _isRefreshing = false.obs;
 
@@ -252,15 +256,47 @@ class _DynamicDetailPageState extends CommonDynPageMultiState<DynamicDetailPage>
 
   @override
   Widget build(BuildContext context) {
+    // iPhone Duo：返回键在竖状态栏里，竖屏时顶栏只在往上滑过作者后才显示
+    // 作者。顶栏改为浮在内容上面、平时隐藏，顶部不再空出一条，作者直接在最上面；
+    // 标签栏滑到顶时停在顶栏下面（见 [_buildPortrait]）
+    _floatingAppBar =
+        isPortrait && IOSNativeTabBar.hidesPageBackButton(context);
+    Widget body = Padding(
+      padding: EdgeInsets.only(left: padding.left, right: padding.right),
+      child: _buildBody(),
+    );
+    if (_floatingAppBar) {
+      body = Stack(
+        children: [
+          Padding(
+            padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top),
+            child: body,
+          ),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Obx(() {
+              final showTitle = controller.showTitle.value;
+              return IgnorePointer(
+                ignoring: !showTitle,
+                child: AnimatedOpacity(
+                  opacity: showTitle ? 1 : 0,
+                  duration: const Duration(milliseconds: 300),
+                  child: _buildAppBar(),
+                ),
+              );
+            }),
+          ),
+        ],
+      );
+    }
     return SelectionTapRegionSurface(
       /// apply `lib/scripts/scrollable.patch`
       isScrolling: () => _scrollable?.shouldIgnorePointer ?? false,
       child: SimpleScaffold(
-        appBar: _buildAppBar(),
-        body: Padding(
-          padding: EdgeInsets.only(left: padding.left, right: padding.right),
-          child: _buildBody(),
-        ),
+        appBar: _floatingAppBar ? null : _buildAppBar(),
+        body: body,
         fab: SlideTransition(
           position: fabAnimation,
           child: _buildBottom(),
@@ -568,7 +604,10 @@ class _DynamicDetailPageState extends CommonDynPageMultiState<DynamicDetailPage>
       child: NestedScrollView(
         scrollBehavior: const NoOverscrollIndicator(),
         headerSliverBuilder: (context, innerBoxIsScrolled) {
-          return [_buildDynPanel()];
+          return [
+            _buildDynPanel(),
+            if (_floatingAppBar) const SliverPinnedGap(extent: kToolbarHeight),
+          ];
         },
         body: Column(
           children: [
