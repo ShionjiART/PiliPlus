@@ -26,6 +26,7 @@ import 'package:PiliPlus/utils/bili_utils.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
 import 'package:PiliPlus/utils/global_data.dart';
 import 'package:PiliPlus/utils/id_utils.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/share_utils.dart';
@@ -191,7 +192,7 @@ class PgcIntroController extends CommonIntroController {
                 showModalBottomSheet(
                   context: context,
                   isScrollControlled: true,
-                  useSafeArea: true,
+                  useSafeArea: IOSNativeTabBar.sheetUseSafeArea,
                   builder: (context) => RepostPanel(
                     rid: epId,
                     /*
