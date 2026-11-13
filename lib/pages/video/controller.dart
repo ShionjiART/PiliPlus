@@ -48,6 +48,7 @@ import 'package:PiliPlus/pages/video/post_panel/view.dart';
 import 'package:PiliPlus/pages/video/send_danmaku/view.dart';
 import 'package:PiliPlus/pages/video/widgets/header_control.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
+import 'package:PiliPlus/plugin/pl_player/models/data_status.dart';
 import 'package:PiliPlus/plugin/pl_player/models/data_source.dart';
 import 'package:PiliPlus/plugin/pl_player/models/heart_beat_type.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
@@ -832,13 +833,26 @@ class VideoDetailController extends GetxController
     return null;
   }
 
+  /// 所有视频页共用同一个播放器。被新页面盖住或已关闭的页面，播放地址晚到时
+  /// 不能再去改播放器，否则会换掉当前页正在播的视频，或者和当前页同时创建播放器，
+  /// 导致黑屏（有时有声音）。回到这一页时 didPopNext 会重新初始化。
+  /// 没有 owner 时（例如直播间关闭时清空了）不拦截。
+  bool get _ownsPlayer {
+    if (isClosed) return false;
+    final owner = PlPlayerController.playOwner;
+    return owner == null || owner.tag == heroTag;
+  }
+
   Future<void> playerInit({
     bool? autoplay,
     bool autoFullScreenFlag = false,
   }) async {
+    if (!_ownsPlayer || (!isFileSource && videoUrl == null)) return;
     Duration? seek = defaultST ?? playedTime;
     if (seek == .zero) seek = null;
     seek ??= getFirstSegment();
+    final systemSource = await _systemPlayerSource();
+    if (!_ownsPlayer) return;
     await plPlayerController.setDataSource(
       isFileSource
           ? FileSource(
@@ -873,10 +887,19 @@ class VideoDetailController extends GetxController
       volume: volume,
       autoFullScreenFlag: autoFullScreenFlag,
       rotate: _rotate,
-      systemSource: await _systemPlayerSource(),
+      systemSource: systemSource,
     );
 
     if (isClosed) return;
+
+    // 初始化失败时退回封面和播放按钮，点一下就能重试，而不是一直黑屏
+    if (_ownsPlayer &&
+        plPlayerController.dataStatus.value == DataStatus.error) {
+      videoState.value = false;
+      _autoPlay.value = false;
+      SmartDialog.showToast('播放器初始化失败，点击封面重试');
+      return;
+    }
 
     if (plPlayerController.enableBlock) {
       initSkip();
