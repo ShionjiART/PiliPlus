@@ -723,8 +723,13 @@ abstract final class Pref {
 
   static bool get dynamicsWaterfallFlow => _setting.get(
     SettingBoxKey.dynamicsWaterfallFlow,
-    defaultValue: horizontalScreen,
+    defaultValue: dynamicsWaterfallFlowDefault,
   );
+
+  /// 折叠屏 iPhone 默认开启瀑布流：列数按宽度自动决定，合上时单列、展开时
+  /// 双列。只在启动时读取一次，不能跟着启动时是否展开走
+  static bool get dynamicsWaterfallFlowDefault =>
+      IOSFoldableHelper.isAuto || horizontalScreen;
 
   static bool get hideTopBar => _setting.get(
     SettingBoxKey.hideTopBar,

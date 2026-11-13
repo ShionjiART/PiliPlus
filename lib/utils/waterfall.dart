@@ -4,6 +4,7 @@ import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/sliver/sliver_constrained_cross_axis.dart';
 import 'package:PiliPlus/utils/global_data.dart';
 import 'package:PiliPlus/utils/grid.dart';
+import 'package:PiliPlus/utils/ios/foldable_helper.dart';
 import 'package:flutter/rendering.dart' show SliverConstraints;
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart'
     show SliverSimpleGridDelegate;
@@ -12,7 +13,16 @@ import 'package:material_ui/material_ui.dart';
 mixin DynMixin {
   late final dynGridDelegate = SliverSimpleGridDelegateWithMaxCrossAxisExtent_(
     maxCrossAxisExtent: Grid.smallCardWidth * 2,
+    adjustCrossAxisCount: _dynCrossAxisCount,
   );
+
+  /// 折叠屏 iPhone 合上时单列，展开时至少两列。内屏竖着拿时扣掉竖状态栏和
+  /// 左侧 UP 主栏后不到两张卡片宽，按宽度算只有一列
+  static int _dynCrossAxisCount(int count) {
+    if (!IOSFoldableHelper.isAuto) return count;
+    if (!IOSFoldableHelper.isUnfolded) return 1;
+    return count < 2 ? 2 : count;
+  }
 
   Widget buildPage(Widget child) {
     if (GlobalData().dynamicsWaterfallFlow) {
@@ -61,6 +71,7 @@ class SliverSimpleGridDelegateWithMaxCrossAxisExtent_
   /// The [maxCrossAxisExtent] argument must be greater than zero.
   SliverSimpleGridDelegateWithMaxCrossAxisExtent_({
     required this.maxCrossAxisExtent,
+    this.adjustCrossAxisCount,
   }) : assert(maxCrossAxisExtent > 0);
 
   /// {@template fsgv.global.maxCrossAxisExtent}
@@ -78,6 +89,9 @@ class SliverSimpleGridDelegateWithMaxCrossAxisExtent_
   /// {@endtemplate}
   final double maxCrossAxisExtent;
 
+  /// 按宽度算出列数后再调整，每次宽度变化时调用
+  final int Function(int count)? adjustCrossAxisCount;
+
   int? crossAxisCount;
   double? crossAxisExtent;
 
@@ -91,8 +105,9 @@ class SliverSimpleGridDelegateWithMaxCrossAxisExtent_
       return crossAxisCount!;
     }
     this.crossAxisExtent = crossAxisExtent;
-    crossAxisCount = (crossAxisExtent / (maxCrossAxisExtent + crossAxisSpacing))
+    final count = (crossAxisExtent / (maxCrossAxisExtent + crossAxisSpacing))
         .ceil();
+    crossAxisCount = adjustCrossAxisCount?.call(count) ?? count;
     return crossAxisCount!;
   }
 

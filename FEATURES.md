@@ -17,6 +17,7 @@
 - [x] 合上时播放器底部的细进度条不再伸到竖栏下面，合上全屏也一样（[#24](https://github.com/ShionjiART/PiliPlus/pull/24)）
 - [x] 视频页隐藏时间和 Wi-Fi，内容铺满竖状态栏的位置（合上和展开都是）
 - [x] 展开后视频页右栏加宽，相关视频的 ⋮ 按钮不再被遮住
+- [x] 动态流合上时单列、展开时双列，不再因为合上状态启动就一直是单列（[#23](https://github.com/ShionjiART/PiliPlus/pull/23)）
 - [x] 保存评论和动态的图片不再比直板手机宽：最多 402pt，和普通 iPhone 一致（[#20](https://github.com/ShionjiART/PiliPlus/pull/20)）
 - [x] 旋转或开合时页面不会被重置
 - [x] 之前手动打开过「横屏适配」的用户，升级后仍保持打开
