@@ -13,6 +13,8 @@ abstract final class SettingBoxKey {
       defaultToastOp = 'defaultToastOp',
       defaultPicQa = 'defaultPicQa',
       enableHA = 'enableHA',
+      systemPlayerHdr = 'systemPlayerHdr',
+      systemPlayerAll = 'systemPlayerAll',
       audioOutput = 'audioOutput',
       bufferSize = 'bufferSize',
       bufferSec = 'bufferSec',

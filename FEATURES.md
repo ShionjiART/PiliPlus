@@ -26,11 +26,14 @@
 
 - [x] iOS 支持 AV1 硬解，更省电、发热更小；不支持的设备自动用软解（[#6](https://github.com/ShionjiART/PiliPlus/pull/6)）
 - [x] iOS 锁屏或切到后台再回来后，自动恢复硬解（[#5](https://github.com/ShionjiART/PiliPlus/pull/5)）
-- [ ] HDR 和杜比视界视频正常显示，不再过曝
+- [x] iOS 上 HDR 和杜比视界视频改用系统播放器播放，画面和官方客户端一致，不再过曝（[#12](https://github.com/ShionjiART/PiliPlus/pull/12)）
+- [x] 可选所有视频都用系统播放器（实验性）（[#12](https://github.com/ShionjiART/PiliPlus/pull/12)）
+- [ ] 系统播放器支持画中画、截图和字幕
 
 ## 投屏
 
 - [x] 修复 iOS 投屏一直「搜索设备失败」、不弹局域网授权（[#9](https://github.com/ShionjiART/PiliPlus/pull/9)）
+- [ ] 支持 AirPlay 投屏，和现有的局域网投屏并存
 
 ## 开发
 
