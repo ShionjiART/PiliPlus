@@ -56,10 +56,13 @@ class NativeTabTool {
 }
 
 /// 从上到下：头像，然后是搜索和私信合在一起的一组。私信只在登录后显示，角标
-/// 和首页顶部的消息按钮一致。头像在已登录时点了弹出账号切换；未登录时显示为
-/// 人形图标，点了去「我的」页面登录
+/// 和首页顶部的消息按钮一致。头像只要本机存有账号就点了弹出账号切换，包括在
+/// 账号切换里选了匿名（[hasAccount] 为 true、[loggedIn] 为 false）的时候，这样
+/// 能切回原来的账号；一个账号都没有时点了去「我的」页面登录。没登录（含匿名）
+/// 时头像显示为人形图标
 List<NativeTabTool> nativeTabTools({
   required bool loggedIn,
+  required bool hasAccount,
   required String? unread,
   required DynamicBadgeMode badgeMode,
   required String face,
@@ -67,10 +70,10 @@ List<NativeTabTool> nativeTabTools({
   NativeTabTool(
     id: 'mine',
     group: 'account',
-    title: loggedIn ? '切换账号' : '点击登录',
+    title: loggedIn || hasAccount ? '切换账号' : '点击登录',
     symbol: 'person.crop.circle',
     image: loggedIn && face.isNotEmpty
-        ? '${face.http2https}@96w_96h.webp'
+        ? '${face.http2https}@120w_120h.webp'
         : null,
   ),
   const NativeTabTool(

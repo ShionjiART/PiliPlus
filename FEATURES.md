@@ -32,6 +32,7 @@
 - [x] Duo 上首页顶部的搜索栏、消息按钮和头像那一行去掉（都已在竖状态栏里），分区标签移到最上面（[#27](https://github.com/ShionjiART/PiliPlus/pull/27)）
 - [x] 二级页面只保留竖状态栏里的返回键，页面左上角的去掉，标题和左边留出间距；竖状态栏的头像点了弹出账号切换，未登录时去「我的」页面登录（[#28](https://github.com/ShionjiART/PiliPlus/pull/28)）
 - [x] 合上时首页、「我的」等页面顶部不再多出一段空白：状态栏在竖栏里时，不再给屏幕顶部留位置（[#31](https://github.com/ShionjiART/PiliPlus/pull/31)）
+- [x] 在账号切换里选了匿名后，点竖栏头像仍弹出账号切换，可以切回原账号；一个账号都没有时才去「我的」登录。竖栏头像图片放大，留白收窄（[#32](https://github.com/ShionjiART/PiliPlus/pull/32)）
 - [ ] 移植 [@Stasert](https://github.com/Stasert) 的竖栏导航等功能，进度见 [#2](https://github.com/ShionjiART/PiliPlus/issues/2)
 
 ## 播放
