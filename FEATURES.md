@@ -14,7 +14,7 @@
 - [x] 合上和展开时自动切换布局，旋转和开合都会跟着调整
 - [x] 首页、动态、我的使用系统原生的 Liquid Glass 标签栏，并放进竖状态栏
 - [x] 页面、播放器控件和直播间都避开竖状态栏
-- [x] 合上时播放器底部的细进度条不再伸到竖栏下面，合上全屏也一样（[#24](https://github.com/ShionjiART/PiliPlus/pull/24)）
+- [x] 合上时播放器底部的进度条铺满整行（摄像头只在竖栏顶部，挡不到），下面一排按钮仍避开竖栏，合上全屏也一样（[#35](https://github.com/ShionjiART/PiliPlus/pull/35)）。控件隐藏时的细进度条起初改成避开竖栏（[#24](https://github.com/ShionjiART/PiliPlus/pull/24)），后来改回铺满（[#35](https://github.com/ShionjiART/PiliPlus/pull/35)）
 - [x] 视频页隐藏时间和 Wi-Fi，内容铺满竖状态栏的位置（合上和展开都是）
 - [x] 展开后视频页右栏加宽，相关视频的 ⋮ 按钮不再被遮住
 - [x] 动态流合上时单列、展开时双列，不再因为合上状态启动就一直是单列（[#23](https://github.com/ShionjiART/PiliPlus/pull/23)）
