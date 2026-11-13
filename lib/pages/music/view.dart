@@ -10,6 +10,7 @@ import 'package:PiliPlus/common/widgets/marquee.dart';
 import 'package:PiliPlus/common/widgets/scaffold/mini_scaffold.dart';
 import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
 import 'package:PiliPlus/common/widgets/selection_text.dart';
+import 'package:PiliPlus/common/widgets/sliver/sliver_pinned_gap.dart';
 import 'package:PiliPlus/common/widgets/sliver/sliver_to_box_adapter.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/http/music.dart';
@@ -27,6 +28,7 @@ import 'package:PiliPlus/utils/extension/iterable_ext.dart';
 import 'package:PiliPlus/utils/extension/num_ext.dart';
 import 'package:PiliPlus/utils/extension/string_ext.dart';
 import 'package:PiliPlus/utils/grid.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:PiliPlus/utils/num_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/share_utils.dart';
@@ -54,20 +56,55 @@ class _MusicDetailPageState extends CommonDynPageState<MusicDetailPage> {
   @override
   dynamic get arguments => null;
 
+  /// 顶栏是否浮在内容上面，见 [build]
+  bool _floatingAppBar = false;
+
   @override
   Widget build(BuildContext context) {
+    // iPhone Duo：返回键在竖状态栏里，竖屏时顶栏只在往上滑过歌曲卡片后才显示
+    // 歌名。和动态详情页一样，顶栏改为浮在内容上面、平时隐藏，顶部不再空出
+    // 一条；评论栏吸顶时停在顶栏下面（见 [_buildBody]）
+    _floatingAppBar =
+        isPortrait && IOSNativeTabBar.hidesPageBackButton(context);
+    Widget body = Padding(
+      padding: EdgeInsets.only(left: padding.left, right: padding.right),
+      child: isPortrait
+          ? refreshIndicator(
+              onRefresh: controller.onRefresh,
+              child: _buildBody(),
+            )
+          : _buildBody(),
+    );
+    if (_floatingAppBar) {
+      body = Stack(
+        children: [
+          Padding(
+            padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top),
+            child: body,
+          ),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Obx(() {
+              final showTitle = controller.showTitle.value;
+              return IgnorePointer(
+                ignoring: !showTitle,
+                child: AnimatedOpacity(
+                  opacity: showTitle ? 1 : 0,
+                  duration: const Duration(milliseconds: 300),
+                  child: _buildAppBar(),
+                ),
+              );
+            }),
+          ),
+        ],
+      );
+    }
     return fabAnimWrapper(
       child: SimpleScaffold(
-        appBar: _buildAppBar(),
-        body: Padding(
-          padding: EdgeInsets.only(left: padding.left, right: padding.right),
-          child: isPortrait
-              ? refreshIndicator(
-                  onRefresh: controller.onRefresh,
-                  child: _buildBody(),
-                )
-              : _buildBody(),
-        ),
+        appBar: _floatingAppBar ? null : _buildAppBar(),
+        body: body,
       ),
     );
   }
@@ -130,6 +167,8 @@ class _MusicDetailPageState extends CommonDynPageState<MusicDetailPage> {
                 SliverToBoxAdapter(
                   child: _buildChart(response, maxWidth),
                 ),
+                if (_floatingAppBar)
+                  const SliverPinnedGap(extent: kToolbarHeight),
                 buildReplyHeader(),
                 Obx(() => replyList(controller.loadingState.value)),
               ],
