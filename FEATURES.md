@@ -34,7 +34,7 @@
 ## 投屏
 
 - [x] 修复 iOS 投屏一直「搜索设备失败」、不弹局域网授权（[#9](https://github.com/ShionjiART/PiliPlus/pull/9)）
-- [ ] 支持 AirPlay 投屏，和现有的局域网投屏并存
+- [x] 支持 AirPlay 投屏，和现有的局域网投屏并存（[#14](https://github.com/ShionjiART/PiliPlus/pull/14)）
 
 ## 开发
 
