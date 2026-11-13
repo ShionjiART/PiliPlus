@@ -156,11 +156,13 @@ class _DynamicDetailPageState extends CommonDynPageMultiState<DynamicDetailPage>
     // 和底部操作栏一样：有数量时显示数量，没有时显示文字
     String caption(DynamicStat? stat, String text) =>
         stat?.count == null ? text : NumUtils.compactCount(stat!.count!);
-    final forward = stat?.forward?.count;
     IOSNativeTabBar.setPageActions(
       route: route,
-      // 从上到下：点赞、评论、分享、转发，最下面单独一个发评论（代替页面上的
-      // 绿色悬浮按钮）。设置里关掉了动态操作栏时只放发评论
+      // 从上到下：点赞、评论、转发（带数量）、分享（只放图标），最下面单独
+      // 一个发评论（代替页面上的绿色悬浮按钮）。设置里关掉了动态操作栏时
+      // 只放发评论。
+      // 通话时竖栏顶部更高、下面更短，按钮要尽量紧凑，否则系统会把放不下的
+      // 收进 ⋯ 菜单
       actions: [
         if (controller.showDynActionBar) ...[
           NativePageAction(
@@ -175,13 +177,13 @@ class _DynamicDetailPageState extends CommonDynPageMultiState<DynamicDetailPage>
             title: '评论',
             count: caption(stat?.comment, '评论'),
           ),
-          const NativePageAction(id: 'share', title: '分享', count: '分享'),
-          // 转发只显示数量，不写「转发」两个字
           NativePageAction(
             id: 'repost',
             title: '转发',
-            count: forward == null ? null : NumUtils.compactCount(forward),
+            count: caption(stat?.forward, '转发'),
           ),
+          // 分享不带数量也不写字
+          const NativePageAction(id: 'share', title: '分享'),
         ],
         const NativePageAction(id: 'reply', title: '发评论', standalone: true),
       ],
