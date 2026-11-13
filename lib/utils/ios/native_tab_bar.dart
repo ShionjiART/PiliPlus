@@ -93,15 +93,23 @@ abstract final class IOSNativeTabBar {
   static final verticalBarHidden = ValueNotifier(false);
 
   /// 状态栏在竖状态栏中时（iPhone Duo）隐藏状态栏，让页面铺满竖状态栏的位置。
-  /// 状态栏在顶部时不生效
-  static bool _hidesVerticalBar = false;
-
+  /// 状态栏在顶部时不生效。
+  ///
+  /// 每次都发给原生层，不按上次的值去重：原生层可能漏掉或重置过状态，重发能让
+  /// 两边重新一致。原生层回复当前是否已隐藏，用它校正 [verticalBarHidden]，
+  /// 以防错过某次 `verticalBarHidden` 通知
   static void setHidesVerticalBar(bool hides) {
-    if (hides == _hidesVerticalBar) return;
-    _hidesVerticalBar = hides;
-    if (Platform.isIOS) {
-      _channel.invokeMethod('setHidesVerticalBar', hides).ignore();
-    }
+    if (!Platform.isIOS) return;
+    _channel
+        .invokeMethod<bool>('setHidesVerticalBar', hides)
+        .then(
+          (hidden) {
+            if (hidden != null) verticalBarHidden.value = hidden;
+          },
+          onError: (_) {
+            // 没有原生标签栏容器（iOS 26 以下）
+          },
+        );
   }
 }
 
