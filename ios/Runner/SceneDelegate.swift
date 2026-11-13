@@ -320,6 +320,29 @@ final class NativeTabBarController: UITabBarController, UITabBarControllerDelega
   }
 }
 
+/// A custom view in a bar item gets no press feedback from the system, so the
+/// button shrinks and fades a little while held, like the system bar items.
+private final class RailPressButton: UIButton {
+  override var isHighlighted: Bool {
+    didSet {
+      guard isHighlighted != oldValue else { return }
+      let pressed = isHighlighted
+      let changes = {
+        self.transform = pressed ? CGAffineTransform(scaleX: 0.9, y: 0.9) : .identity
+        self.alpha = pressed ? 0.6 : 1
+      }
+      if UIAccessibility.isReduceMotionEnabled {
+        changes()
+      } else {
+        UIView.animate(
+          withDuration: pressed ? 0.12 : 0.3, delay: 0, usingSpringWithDamping: 0.7,
+          initialSpringVelocity: 0, options: [.beginFromCurrentState, .allowUserInteraction],
+          animations: changes)
+      }
+    }
+  }
+}
+
 /// iPhone Duo: wraps the tabs so pages can put their own buttons in the
 /// vertical bar through the navigation bar, which UIKit moves into the vertical
 /// bar. For now that is a back button on secondary pages; the in-page back
@@ -548,7 +571,30 @@ final class NativePageNavigationController: UINavigationController {
       let animate = view.window != nil && !UIAccessibility.isReduceMotionEnabled
       setNavigationBarHidden(!visible, animated: animate)
     }
-    let showsActions = false
+    // The page's own buttons go in the toolbar, which UIKit puts in the lower
+    // part of the vertical bar; secondary pages have no tab bar there.
+    let showsActions = visible && !pageActions.isEmpty
+    // UIKit rebuilds the vertical bar for the other display when the device
+    // folds or unfolds, and the custom views of the count buttons do not come
+    // along: the bar shows an empty group. Make new items for the new display.
+    let displaySize = view.window?.bounds.size
+    if displaySize != actionDisplaySize {
+      actionDisplaySize = displaySize
+      actionCache.removeAll()
+    }
+    let actionItems = showsActions ? pageActions.compactMap(makeActionItem) : []
+    let currentItems = (content.toolbarItems ?? []).filter {
+      $0.identifier != Self.toolbarSpaceID
+    }
+    if currentItems.map(ObjectIdentifier.init) != actionItems.map(ObjectIdentifier.init) {
+      let space = UIBarButtonItem(systemItem: .flexibleSpace)
+      space.identifier = Self.toolbarSpaceID
+      content.setToolbarItems(actionItems.isEmpty ? nil : [space] + actionItems, animated: false)
+    }
+    if isToolbarHidden == showsActions {
+      let animate = view.window != nil && !UIAccessibility.isReduceMotionEnabled
+      setToolbarHidden(!showsActions, animated: animate)
+    }
     let changed = showsBack != backButtonVisible || showsActions != actionsVisible
     barsVisible = visible
     backButtonVisible = showsBack
@@ -561,6 +607,107 @@ final class NativePageNavigationController: UINavigationController {
       toolsShown = toolsAvailable
       onToolsShownChange?(toolsAvailable)
     }
+  }
+
+  private static let toolbarSpaceID = "piliplus.toolbar.space"
+  private var actionCache: [String: (NSDictionary, UIBarButtonItem)] = [:]
+  private var actionDisplaySize: CGSize?
+  private var actionsInFlight = Set<String>()
+
+  /// A page button. With a `count`, a compact button with the icon on top and
+  /// the count below, so it fits the vertical bar's width.
+  private func makeActionItem(_ descriptor: [String: Any]) -> UIBarButtonItem? {
+    guard let id = descriptor["id"] as? String, !id.isEmpty else { return nil }
+    let owner = actionsOwner
+    var signature = descriptor
+    signature["owner"] = owner
+    let key = NSDictionary(dictionary: signature)
+    if let cached = actionCache[id], cached.0 == key { return cached.1 }
+
+    let title = descriptor["title"] as? String ?? ""
+    let count = descriptor["count"] as? String
+    let selected = descriptor["selected"] as? Bool ?? false
+    let enabled = descriptor["enabled"] as? Bool ?? true
+    let color: UIColor? =
+      selected ? (descriptor["selectedColor"] as? Int).map(Self.color(argb:)) ?? .tintColor : nil
+    let image = UIImage(systemName: Self.actionSymbol(id, selected: selected))
+    let handler: UIActionHandler = { [weak self] _ in
+      self?.requestPageAction(owner: owner, id: id)
+    }
+    let item: UIBarButtonItem
+    if let count {
+      var configuration = UIButton.Configuration.plain()
+      configuration.image = image
+      configuration.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(
+        pointSize: 18.5)
+      configuration.title = count
+      configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer {
+        var attributes = $0
+        attributes.font = UIFont.preferredFont(forTextStyle: .caption1)
+        return attributes
+      }
+      configuration.titleLineBreakMode = .byClipping
+      configuration.imagePlacement = .top
+      configuration.imagePadding = 3
+      configuration.contentInsets = .zero
+      configuration.baseForegroundColor = color ?? .label
+      // Not a primaryAction: its title would replace the count.
+      let button = RailPressButton(configuration: configuration, primaryAction: nil)
+      button.addAction(UIAction(handler: handler), for: .touchUpInside)
+      button.isEnabled = enabled
+      button.accessibilityLabel = "\(title)，\(count)"
+      button.accessibilityTraits = selected ? [.button, .selected] : .button
+      let size = CGSize(width: 44, height: 56)
+      button.frame = CGRect(origin: .zero, size: size)
+      let container = UIView(frame: button.frame)
+      container.addSubview(button)
+      container.widthAnchor.constraint(equalToConstant: size.width).isActive = true
+      container.heightAnchor.constraint(equalToConstant: size.height).isActive = true
+      item = UIBarButtonItem(customView: container)
+      // Shown when the bar is too short and the item moves into a menu.
+      item.menuRepresentation = UIAction(title: title, image: image, handler: handler)
+    } else {
+      item = UIBarButtonItem(
+        title: title, image: image,
+        primaryAction: UIAction(title: title, image: image, handler: handler))
+      item.tintColor = color
+    }
+    item.title = title
+    item.identifier = "piliplus.page.\(id)"
+    item.isEnabled = enabled
+    // A standalone button, such as the reply button, gets its own background
+    // instead of joining the group of its neighbours.
+    item.sharesBackground = !(descriptor["standalone"] as? Bool ?? false)
+    #if compiler(>=6.4)
+      if #available(iOS 27.1, *) { item.axisBehavior = .verticalPreferred }
+    #endif
+    actionCache[id] = (key, item)
+    return item
+  }
+
+  private static func actionSymbol(_ id: String, selected: Bool) -> String {
+    switch id {
+    case "repost": return "arrowshape.turn.up.right"
+    case "share": return "square.and.arrow.up"
+    case "comment": return "bubble.right"
+    case "like": return selected ? "hand.thumbsup.fill" : "hand.thumbsup"
+    case "reply": return "arrowshape.turn.up.left.fill"
+    default: return "ellipsis"
+    }
+  }
+
+  private static func color(argb: Int) -> UIColor {
+    UIColor(
+      red: CGFloat((argb >> 16) & 0xff) / 255, green: CGFloat((argb >> 8) & 0xff) / 255,
+      blue: CGFloat(argb & 0xff) / 255, alpha: CGFloat((argb >> 24) & 0xff) / 255)
+  }
+
+  private func requestPageAction(owner: Int, id: String) {
+    guard barsVisible, owner == actionsOwner else { return }
+    // One action at a time per button: a like waits for the request.
+    let key = "\(owner):\(id)"
+    guard actionsInFlight.insert(key).inserted else { return }
+    onPageAction?(owner, id) { [weak self] in self?.actionsInFlight.remove(key) }
   }
 
   private func requestBack() {
