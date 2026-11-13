@@ -8,6 +8,7 @@ import 'package:PiliPlus/pages/main/controller.dart';
 import 'package:PiliPlus/pages/mine/controller.dart';
 import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:get/get.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:material_ui/material_ui.dart';
@@ -97,8 +98,19 @@ class _HomePageState extends CommonPageState<HomePage>
         searchBar(),
         const SizedBox(width: 4),
         msgBadge(_mainController),
-        const SizedBox(width: 8),
-        userAvatar(colorScheme: _colorScheme, mainController: _mainController),
+        // iPhone Duo：头像移到了竖状态栏顶部
+        ValueListenableBuilder(
+          valueListenable: IOSNativeTabBar.toolsShown,
+          builder: (context, toolsShown, _) => toolsShown
+              ? const SizedBox.shrink()
+              : Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: userAvatar(
+                    colorScheme: _colorScheme,
+                    mainController: _mainController,
+                  ),
+                ),
+        ),
       ],
     );
     if (_homeController.hideTopBar) {

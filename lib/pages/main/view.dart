@@ -18,9 +18,11 @@ import 'package:PiliPlus/utils/extension/size_ext.dart';
 import 'package:PiliPlus/utils/extension/theme_ext.dart';
 import 'package:PiliPlus/utils/ios/foldable_helper.dart';
 import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
+import 'package:PiliPlus/utils/ios/native_tab_tools.dart';
 import 'package:PiliPlus/utils/mobile_observer.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
@@ -86,11 +88,57 @@ class _MainAppState extends PopScopeState<MainApp>
               : null,
         );
       }),
+      ever(_mainController.accountService.isLogin, (_) => _updateTools()),
+      ever(_mainController.msgUnReadCount, (_) => _updateTools()),
+      ever(_mainController.accountService.face, (_) => _updateTools()),
     ]);
+    IOSNativeTabBar.onToolAction = _onTool;
+    _updateTools();
     setState(() {
       _mainController.useNativeTabBar = true;
       _updateNavMode();
     });
+  }
+
+  List<NativeTabTool>? _sentTools;
+
+  /// iPhone Duo 的一级页面在竖状态栏顶部显示搜索、消息和头像。首页顶部的
+  /// 搜索栏和消息按钮照常保留，头像移到竖状态栏后从首页顶部去掉
+  void _updateTools() {
+    final tools = nativeTabTools(
+      loggedIn: _mainController.accountService.isLogin.value,
+      unread: _mainController.msgUnReadCount.value,
+      badgeMode: _mainController.msgBadgeMode,
+      face: _mainController.accountService.face.value,
+    );
+    if (listEquals(tools, _sentTools)) return;
+    _sentTools = tools;
+    IOSNativeTabBar.setTools(tools);
+  }
+
+  Future<void> _onTool(String id) async {
+    // 这些按钮只在一级页面显示，这里再确认一次，避免点击晚到时叠开页面
+    if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? true)) return;
+    switch (id) {
+      case 'search':
+        Get.toNamed(
+          '/search',
+          parameters:
+              _mainController.hasHome &&
+                  _mainController.homeController.enableSearchWord
+              ? {'hintText': _mainController.homeController.defaultSearch.value}
+              : null,
+        );
+      case 'notifications':
+        if (!_mainController.accountService.isLogin.value) return;
+        _mainController
+          ..clearUnreadMsg()
+          ..lastCheckUnreadAt = DateTime.now().millisecondsSinceEpoch;
+        Get.toNamed('/whisper');
+      case 'mine':
+        // 和首页顶部的头像一样：已登录去「我的」，未登录去登录
+        _mainController.toMinePage();
+    }
   }
 
   @override
@@ -170,6 +218,9 @@ class _MainAppState extends PopScopeState<MainApp>
     removeObserverMobile(this);
     for (final worker in _nativeTabBarWorkers) {
       worker.dispose();
+    }
+    if (IOSNativeTabBar.onToolAction == _onTool) {
+      IOSNativeTabBar.onToolAction = null;
     }
     PiliScheme.listener?.cancel();
     GStorage.close();

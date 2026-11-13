@@ -7,6 +7,7 @@ import 'package:PiliPlus/utils/ios/foldable_helper.dart';
 import 'package:PiliPlus/utils/ios/native_navigation_batch.dart';
 import 'package:PiliPlus/utils/ios/native_navigation_observer.dart';
 import 'package:PiliPlus/utils/ios/native_page_actions.dart';
+import 'package:PiliPlus/utils/ios/native_tab_tools.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
@@ -56,6 +57,10 @@ abstract final class IOSNativeTabBar {
           );
         case 'pageActionsVisible':
           pageActionsVisible.value = call.arguments as bool;
+        case 'toolAction':
+          await onToolAction?.call(call.arguments as String);
+        case 'toolsShown':
+          toolsShown.value = call.arguments as bool;
       }
     });
     try {
@@ -112,6 +117,25 @@ abstract final class IOSNativeTabBar {
   static void setHidden(bool hidden) {
     if (_enabled) _channel.invokeMethod('setHidden', hidden);
   }
+
+  /// 竖状态栏顶部的搜索、消息、头像按钮（iPhone Duo 的一级页面）。原生层只在
+  /// 有竖状态栏时显示，其他设备上不显示
+  static void setTools(List<NativeTabTool> tools) {
+    if (_enabled) {
+      _channel
+          .invokeMethod('setTools', [for (final e in tools) e.toMap()])
+          .catchError((_) {
+            // 没有原生导航容器（iOS 27.1 以下或非 iPhone）
+          });
+    }
+  }
+
+  /// 点击 [setTools] 里的按钮，参数为按钮的 id
+  static Future<void> Function(String id)? onToolAction;
+
+  /// 竖状态栏里是否有 [setTools] 的按钮（由原生层告知）。为 true 时页面里
+  /// 重复的入口（首页顶部的头像）可以去掉
+  static final toolsShown = ValueNotifier(false);
 
   /// 竖状态栏是否已按 [setHidesVerticalBar] 隐藏。隐藏后竖状态栏的安全区仍然
   /// 存在（摄像头在其中），页面内容可以忽略它铺满
