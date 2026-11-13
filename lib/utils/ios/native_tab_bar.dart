@@ -36,6 +36,10 @@ abstract final class IOSNativeTabBar {
   /// 由原生层转发；为 null 时使用 Flutter 自己的值
   static final safeArea = ValueNotifier<EdgeInsets?>(null);
 
+  /// 侧边安全区达到这个宽度（原生 pt）时就是竖状态栏，和 SceneDelegate 的
+  /// 判断一致；普通 iPhone 横屏时灵动岛那一侧最多约 62pt
+  static const double verticalBarMinInset = 72;
+
   static Future<void> init() async {
     if (!Platform.isIOS) return;
     _channel.setMethodCallHandler((call) async {
@@ -270,7 +274,7 @@ class NativeSafeArea extends StatelessWidget {
           // 竖状态栏（右侧安全区 ≥72，和 SceneDelegate 的判断一致；普通
           // iPhone 横屏时的刘海不到 72）的位置，供左右滑动的页面延伸到它下面
           child: RailViewportScope(
-            insets: insets.right >= 72
+            insets: insets.right >= IOSNativeTabBar.verticalBarMinInset
                 ? EdgeInsets.only(right: viewPadding.right)
                 : EdgeInsets.zero,
             windowWidth: mediaQuery.size.width,

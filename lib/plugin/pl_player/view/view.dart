@@ -1794,9 +1794,12 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
         if (isFullScreen || plPlayerController.isDesktopPip) ...[
           // 锁
           if (plPlayerController.showFsLockBtn)
+            // 和进度条一样铺到竖状态栏上：iPhone Duo 合上时摄像头只在
+            // 竖栏一端，挡不到中间的按钮
             ViewSafeArea(
               right: false,
               left: !plPlayerController.removeSafeArea,
+              overVerticalBar: true,
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: FractionalTranslation(
@@ -1841,6 +1844,8 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
             ViewSafeArea(
               left: false,
               right: !plPlayerController.removeSafeArea,
+              // 同上，竖栏在右边时截图按钮也铺上去
+              overVerticalBar: true,
               child: Obx(
                 () => Align(
                   alignment: Alignment.centerRight,
