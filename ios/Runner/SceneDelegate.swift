@@ -44,6 +44,12 @@ class SceneDelegate: FlutterSceneDelegate {
           navigation.onVisibilityChange = { [weak tabs] back, actions in
             tabs?.publishBarVisibility(back: back, actions: actions)
           }
+          navigation.onTool = { [weak tabs] id, completion in
+            tabs?.requestTool(id, completion: completion)
+          }
+          navigation.onToolsShownChange = { [weak tabs] shown in
+            tabs?.publishToolsShown(shown)
+          }
           root = navigation
         }
       #endif
@@ -158,6 +164,9 @@ final class NativeTabBarController: UITabBarController, UITabBarControllerDelega
       selectedIndex = selected
       setTabBarHidden(false, animated: false)
       result(true)
+    case "setTools":
+      navigationHost?.setTools(call.arguments as? [[String: Any]] ?? [])
+      result(nil)
     case "setSelected":
       if let index = call.arguments as? Int { select(index) }
       result(nil)
@@ -188,6 +197,14 @@ final class NativeTabBarController: UITabBarController, UITabBarControllerDelega
     case "mine": return ("person", "person.fill")
     default: return ("circle", "circle.fill")
     }
+  }
+
+  func requestTool(_ id: String, completion: @escaping () -> Void) {
+    channel?.invokeMethod("toolAction", arguments: id) { _ in completion() }
+  }
+
+  func publishToolsShown(_ shown: Bool) {
+    channel?.invokeMethod("toolsShown", arguments: shown)
   }
 
   private func select(_ index: Int) {
@@ -317,6 +334,19 @@ final class NativePageNavigationController: UINavigationController {
   var onBack: ((@escaping () -> Void) -> Void)?
   var onPageAction: ((Int, String, @escaping () -> Void) -> Void)?
   var onVisibilityChange: ((_ back: Bool, _ actions: Bool) -> Void)?
+  var onTool: ((String, @escaping () -> Void) -> Void)?
+  /// Whether the vertical bar has the tools, so the page can drop its own
+  /// copy (the home page's avatar).
+  var onToolsShownChange: ((Bool) -> Void)?
+
+  // Search, notifications and the avatar: shown at the top of the vertical bar
+  // on root pages, where secondary pages show the back button.
+  private var toolGroups: [[UIBarButtonItem]] = []
+  private var toolCache: [String: UIBarButtonItem] = [:]
+  private var toolInFlight = false
+  private var toolsShown: Bool?
+  private var avatarURL: String?
+  private var avatarTask: URLSessionDataTask?
 
   private var canGoBack = false
   private var actionsOwner = 0
@@ -376,6 +406,103 @@ final class NativePageNavigationController: UINavigationController {
     updateBars()
   }
 
+  /// Each tool: `id`, `title`, an SF Symbol name in `symbol`, an optional
+  /// `badge` (empty for a dot) and an optional `image` URL drawn as a circle.
+  func setTools(_ descriptors: [[String: Any]]) {
+    var seen = Set<String>()
+    var groups: [[UIBarButtonItem]] = []
+    var lastGroup: String?
+    for descriptor in descriptors {
+      guard let id = descriptor["id"] as? String, !id.isEmpty, seen.insert(id).inserted
+      else { continue }
+      let item = toolCache[id] ?? makeToolItem(id)
+      toolCache[id] = item
+      let title = descriptor["title"] as? String
+      item.title = title
+      item.accessibilityLabel = title
+      if let url = descriptor["image"] as? String, !url.isEmpty {
+        loadAvatar(url, into: item, placeholder: descriptor["symbol"] as? String)
+      } else {
+        if item === avatarItem { cancelAvatar() }
+        item.image = UIImage(systemName: descriptor["symbol"] as? String ?? "circle")
+      }
+      if let badge = descriptor["badge"] as? String {
+        item.badge = badge.isEmpty ? .indicator() : .string(badge)
+      } else {
+        item.badge = nil
+      }
+      // Adjacent tools of the same group share one button in the bar.
+      let group = descriptor["group"] as? String
+      if group != nil, group == lastGroup, !groups.isEmpty {
+        groups[groups.count - 1].append(item)
+      } else {
+        groups.append([item])
+      }
+      lastGroup = group
+    }
+    // A lone item would otherwise share its background with the next group
+    // (the avatar and search look like one button while logged out).
+    for group in groups {
+      for item in group { item.sharesBackground = group.count > 1 }
+    }
+    toolGroups = groups
+    updateBars()
+  }
+
+  private weak var avatarItem: UIBarButtonItem?
+
+  private func makeToolItem(_ id: String) -> UIBarButtonItem {
+    let item = UIBarButtonItem(
+      title: nil, image: nil,
+      primaryAction: UIAction { [weak self] _ in self?.requestTool(id) })
+    item.identifier = "piliplus.navigation.tool.\(id)"
+    return item
+  }
+
+  private func loadAvatar(_ url: String, into item: UIBarButtonItem, placeholder: String?) {
+    avatarItem = item
+    guard url != avatarURL else { return }
+    cancelAvatar()
+    avatarURL = url
+    if item.image == nil, let placeholder { item.image = UIImage(systemName: placeholder) }
+    guard let source = URL(string: url) else { return }
+    avatarTask = URLSession.shared.dataTask(with: source) { [weak self, weak item] data, _, _ in
+      guard let data, let image = UIImage(data: data) else { return }
+      let size = CGSize(width: 30, height: 30)
+      let circle = UIGraphicsImageRenderer(size: size).image { _ in
+        UIBezierPath(ovalIn: CGRect(origin: .zero, size: size)).addClip()
+        // Fill the circle, cropping the longer side.
+        let scale = max(size.width / image.size.width, size.height / image.size.height)
+        let drawn = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+        image.draw(in: CGRect(
+          x: (size.width - drawn.width) / 2, y: (size.height - drawn.height) / 2,
+          width: drawn.width, height: drawn.height))
+      }.withRenderingMode(.alwaysOriginal)
+      DispatchQueue.main.async {
+        guard let self, self.avatarURL == url else { return }
+        item?.image = circle
+      }
+    }
+    avatarTask?.resume()
+  }
+
+  private func cancelAvatar() {
+    avatarTask?.cancel()
+    avatarTask = nil
+    avatarURL = nil
+  }
+
+  private func requestTool(_ id: String) {
+    guard barsVisible, !canGoBack, !toolInFlight else { return }
+    // One page per tap, as with the back button.
+    toolInFlight = true
+    onTool?(id) { [weak self] in
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+        self?.toolInFlight = false
+      }
+    }
+  }
+
   private var hasVerticalBar: Bool {
     #if compiler(>=6.4)
       if #available(iOS 27.1, *) {
@@ -392,7 +519,9 @@ final class NativePageNavigationController: UINavigationController {
 
     let visible = hasVerticalBar && !verticalBarHidden
     let showsBack = visible && canGoBack
-    let leadingItems: [[UIBarButtonItem]] = showsBack ? [[backItem]] : []
+    let showsTools = visible && !canGoBack && !toolGroups.isEmpty
+    let leadingItems: [[UIBarButtonItem]] =
+      showsBack ? [[backItem]] : showsTools ? toolGroups : []
     let signature = leadingItems.map { $0.map(ObjectIdentifier.init) }
     // UIKit rebuilds the navigation bar, and drops these groups, when the
     // scene moves between the inner and outer display, so compare with what it
@@ -425,6 +554,13 @@ final class NativePageNavigationController: UINavigationController {
     backButtonVisible = showsBack
     actionsVisible = showsActions
     if changed { onVisibilityChange?(showsBack, showsActions) }
+    // Not tied to the current page or the video page hiding the bar, so the
+    // home page does not change layout while it is covered.
+    let toolsAvailable = hasVerticalBar && !toolGroups.isEmpty
+    if toolsAvailable != toolsShown {
+      toolsShown = toolsAvailable
+      onToolsShownChange?(toolsAvailable)
+    }
   }
 
   private func requestBack() {
