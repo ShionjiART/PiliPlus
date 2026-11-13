@@ -44,11 +44,14 @@ enum SystemPlayerHLS {
     var spsTransfer: Int?
   }
 
-  /// Fetches `[0, track.indexEnd]` and parses ftyp/moov/sidx.
+  /// Fetches `[0, track.indexEnd]` and parses ftyp/moov/sidx. Without a known
+  /// index range (bilibili sometimes leaves `segment_base` out), the first
+  /// 512 KB are fetched instead; the boxes sit at the very start of the file.
   static func load(_ track: DashTrack, headers: [String: String]) async throws -> Media {
     var request = URLRequest(url: track.url)
     for (k, v) in headers { request.setValue(v, forHTTPHeaderField: k) }
-    request.setValue("bytes=0-\(track.indexEnd)", forHTTPHeaderField: "Range")
+    let end = track.indexEnd > 0 ? track.indexEnd : 512 * 1024 - 1
+    request.setValue("bytes=0-\(end)", forHTTPHeaderField: "Range")
     let (data, response) = try await URLSession.shared.data(for: request)
     let status = (response as? HTTPURLResponse)?.statusCode ?? 0
     guard status == 206 || status == 200 else { throw SystemPlayerHLSError.badResponse(status) }
@@ -366,6 +369,10 @@ extension SystemPlayerHLS {
 enum SystemPlayerLocalError: Error {
   case unsupportedOS
   case noVideoTrack
+  /// AVFoundation opens a local `hev1` file (parameter sets in-band) but
+  /// decodes no picture, unlike over HLS. Most of bilibili's SDR HEVC is
+  /// `hev1`, so these stay on mpv without trying.
+  case hev1
 }
 
 /// Downloaded (offline) DASH files. An HLS playlist cannot point at local
@@ -380,6 +387,8 @@ enum SystemPlayerLocal {
     AVAsset, video: SystemPlayerHLS.TrackInfo, audio: SystemPlayerHLS.TrackInfo?
   ) {
     guard #available(iOS 15.0, *) else { throw SystemPlayerLocalError.unsupportedOS }
+    let videoInfo = SystemPlayerHLS.info(head: head(video))
+    if videoInfo.codecs?.hasPrefix("hev1") == true { throw SystemPlayerLocalError.hev1 }
     let videoAsset = try urlAsset(video)
     guard let videoTrack = try await videoAsset.loadTracks(withMediaType: .video).first else {
       throw SystemPlayerLocalError.noVideoTrack
@@ -404,7 +413,7 @@ enum SystemPlayerLocal {
         audioInfo = SystemPlayerHLS.info(head: head(audio))
       }
     }
-    return (composition, SystemPlayerHLS.info(head: head(video)), audioInfo)
+    return (composition, videoInfo, audioInfo)
   }
 
   /// bilibili's files end in .m4s, which AVFoundation does not recognise as
