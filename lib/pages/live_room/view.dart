@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:ui';
 
+import 'package:PiliPlus/common/widgets/rail_page_view.dart';
 import 'package:PiliPlus/common/assets.dart';
 import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/button/icon_button.dart';
@@ -838,7 +839,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
     return Padding(
       padding: .only(bottom: 12, top: isPortrait ? 12 : 0),
       child: liveController.showSuperChat
-          ? PageView(
+          ? RailPageView(
               key: pageKey,
               controller: liveController.pageController,
               physics: tabBarScrollPhysics,
