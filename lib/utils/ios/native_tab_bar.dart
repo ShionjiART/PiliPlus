@@ -36,6 +36,10 @@ abstract final class IOSNativeTabBar {
   /// 由原生层转发；为 null 时使用 Flutter 自己的值
   static final safeArea = ValueNotifier<EdgeInsets?>(null);
 
+  /// 侧边安全区达到这个宽度（原生 pt）时就是竖状态栏，和 SceneDelegate 的
+  /// 判断一致；普通 iPhone 横屏时灵动岛那一侧最多约 62pt
+  static const double verticalBarMinInset = 72;
+
   static Future<void> init() async {
     if (!Platform.isIOS) return;
     _channel.setMethodCallHandler((call) async {
@@ -150,6 +154,34 @@ abstract final class IOSNativeTabBar {
   /// 底部弹窗的 `useSafeArea`。竖状态栏隐藏时（视频页）弹窗和页面内容一样
   /// 铺满竖状态栏的位置，不再按它的安全区在一侧留出空白
   static bool get sheetUseSafeArea => !verticalBarHidden.value;
+
+  /// 对话框的安全区，替换 [DialogRoute] 默认的 [SafeArea]（见
+  /// `lib/scripts/material/dialog_safe_area.patch`）。
+  ///
+  /// 竖状态栏隐藏时（视频页）页面铺满竖状态栏的位置，对话框也不再让开它，
+  /// 在整个屏幕里水平居中。摄像头在竖状态栏的一端，所以上下各留出竖状态栏的
+  /// 宽度（至少和原来的安全区一样），两边相同，垂直方向也保持居中
+  static Widget dialogSafeArea(BuildContext context, Widget dialog) =>
+      ValueListenableBuilder<bool>(
+        valueListenable: verticalBarHidden,
+        builder: (context, hidden, dialog) {
+          if (!hidden) return SafeArea(child: dialog!);
+          final padding = MediaQuery.paddingOf(context);
+          final vertical = [
+            padding.top,
+            padding.bottom,
+            padding.left,
+            padding.right,
+          ].reduce(max);
+          return SafeArea(
+            left: false,
+            right: false,
+            minimum: EdgeInsets.symmetric(vertical: vertical),
+            child: dialog!,
+          );
+        },
+        child: dialog,
+      );
 
   /// 状态栏在竖状态栏中时（iPhone Duo）隐藏状态栏，让页面铺满竖状态栏的位置。
   /// 状态栏在顶部时不生效。
@@ -270,7 +302,7 @@ class NativeSafeArea extends StatelessWidget {
           // 竖状态栏（右侧安全区 ≥72，和 SceneDelegate 的判断一致；普通
           // iPhone 横屏时的刘海不到 72）的位置，供左右滑动的页面延伸到它下面
           child: RailViewportScope(
-            insets: insets.right >= 72
+            insets: insets.right >= IOSNativeTabBar.verticalBarMinInset
                 ? EdgeInsets.only(right: viewPadding.right)
                 : EdgeInsets.zero,
             windowWidth: mediaQuery.size.width,

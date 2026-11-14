@@ -216,9 +216,14 @@ $TabsPatchMaterial = "lib/scripts/material/tabs.patch"
 # AppBar.hideImpliedBackButton.
 $AppBarNativeBackPatchMaterial = "lib/scripts/material/app_bar_native_back.patch"
 
+# iPhone Duo: lets dialogs on the video page stay centered over the hidden
+# vertical bar instead of keeping clear of it. Applied on every platform, since
+# main.dart sets DialogRoute.safeAreaBuilder.
+$DialogSafeAreaPatchMaterial = "lib/scripts/material/dialog_safe_area.patch"
+
 $patches_material = @($ModalBarrierPatchMaterial, $NavigationDrawerPatchMaterial, $PopupMenuPatchMaterial,
                     $FABPatchMaterial, $TextFieldPatchMaterial, $ScaffoldPatchMaterial, $RefreshIndicatorPatchMaterial,
-                    $TabsPatchMaterial, $AppBarNativeBackPatchMaterial)
+                    $TabsPatchMaterial, $AppBarNativeBackPatchMaterial, $DialogSafeAreaPatchMaterial)
 
 $PubCacheDir = "~/.pub-cache"
 
