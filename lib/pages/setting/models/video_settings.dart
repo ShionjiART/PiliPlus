@@ -54,6 +54,7 @@ Future<bool> _confirmSystemPlayerAll(BuildContext context, bool value) async {
         '· 设备不支持 AV1 硬解时的 AV1 视频，以及部分已缓存的普通 HEVC 视频，仍使用内置播放器\n\n'
         '可能的后果\n'
         '· 超分辨率不可用\n'
+        '· 倍速最高 2x（包括长按倍速）\n'
         '· 「硬解模式」「缓冲大小」「缓冲时长」「视频同步」等内置播放器设置对这些视频不生效\n'
         '· 系统播放器出错、加载超时或没有画面时，会自动切回内置播放器继续播放\n\n'
         '改动在下次打开视频时生效。',
@@ -83,7 +84,7 @@ List<SettingsModel> get videoSettings => [
     ),
     const SwitchModel(
       title: '所有视频均采用系统播放器',
-      subtitle: '实验性功能',
+      subtitle: '实验性功能，倍速最高 2x',
       leading: Icon(Icons.smart_display_outlined),
       setKey: SettingBoxKey.systemPlayerAll,
       confirmChange: _confirmSystemPlayerAll,
