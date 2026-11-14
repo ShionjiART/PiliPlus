@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' show max;
 
 import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/floating_navigation_bar.dart';
@@ -65,7 +66,40 @@ class _MainAppState extends PopScopeState<MainApp>
     }
     if (Platform.isIOS) {
       _attachNativeTabBar();
+      if (IOSFoldableHelper.isIPhone && _mainController.hasHome) {
+        final showTopBar = _mainController.homeController.showTopBar;
+        _homeTopWorkers.addAll([
+          ever(_mainController.selectedIndex, (_) => _syncHomeStatusBar()),
+          if (_mainController.barOffset case final barOffset?)
+            ever(barOffset, (_) => _syncHomeStatusBar()),
+          if (showTopBar != null) ever(showTopBar, (_) => _syncHomeStatusBar()),
+        ]);
+      }
     }
+  }
+
+  final List<Worker> _homeTopWorkers = [];
+
+  /// 主页面是否在最上层（没有打开二级页面）
+  bool _isCurrent = true;
+
+  /// iPhone Duo 展开竖屏：首页顶栏收起时连同顶部的状态栏一起隐藏，
+  /// 和 B 站官方客户端一样；打开其他页面或切到其他标签时恢复
+  void _syncHomeStatusBar({bool force = false}) {
+    final main = _mainController;
+    var hide = false;
+    if (main.homeTopInStatusBar &&
+        _isCurrent &&
+        main.hasHome &&
+        main.homeController.hideTopBar &&
+        main.navigationBars[main.selectedIndex.value] == .home) {
+      if (main.barOffset case final barOffset?) {
+        hide = barOffset.value > main.topBarExtent / 2;
+      } else if (main.homeController.showTopBar case final showTopBar?) {
+        hide = !showTopBar.value;
+      }
+    }
+    IOSNativeTabBar.setMainHidesStatusBar(hide, force: force);
   }
 
   final List<Worker> _nativeTabBarWorkers = [];
@@ -187,12 +221,53 @@ class _MainAppState extends PopScopeState<MainApp>
     } else if (!_mainController.useSideBar) {
       _mainController.useBottomNav = MediaQuery.isPortraitOf(context);
     }
+    _updateHomeTop();
+  }
+
+  /// iPhone Duo 展开竖屏时状态栏在顶部右侧，左边空着，首页的头像、搜索和
+  /// 消息放进这一行（见 [HomePage]）。普通 iPhone 的最短边不到 600，不会触发
+  void _updateHomeTop() {
+    final size = MediaQuery.sizeOf(context);
+    final homeTop =
+        IOSFoldableHelper.isIPhone &&
+        _mainController.useBottomNav &&
+        !_mainController.useStatusBarNav &&
+        size.height > size.width &&
+        size.shortestSide >= 600;
+    final changed = homeTop != _mainController.homeTopInStatusBar;
+    _mainController.homeTopInStatusBar = homeTop;
+    // 状态栏隐藏后顶部的安全区可能变小，按显示时的高度排版，收起时不会跳动。
+    // 进入时状态栏可能正被视频页隐藏，至少留出搜索栏那一行的高度
+    _mainController.homeTopHeight = homeTop
+        ? max(
+            Style.topBarHeight,
+            changed
+                ? _padding.top
+                : max(_mainController.homeTopHeight, _padding.top),
+          )
+        : 0;
+    _mainController.topBarExtent = homeTop
+        ? _mainController.homeTopHeight
+        : Style.topBarHeight;
+    if (changed) {
+      // 换了布局，顶栏和底栏重新显示。不能在构建过程中改
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _mainController
+          ..barOffset?.value = 0.0
+          ..showBottomBar?.value = true
+          ..setSearchBar();
+        _syncHomeStatusBar(force: true);
+      });
+    }
   }
 
   // 系统标签栏的隐藏和恢复由 IOSNativeTabBar.navigationObserver 负责：这里只能
   // 收到 GetX 页面的通知，图片查看器等其他页面盖在主页上时收不到
   @override
   void didPopNext() {
+    _isCurrent = true;
+    _syncHomeStatusBar(force: true);
     addObserverMobile(this);
     _mainController
       ..checkUnreadDynamic()
@@ -203,6 +278,8 @@ class _MainAppState extends PopScopeState<MainApp>
 
   @override
   void didPushNext() {
+    _isCurrent = false;
+    _syncHomeStatusBar(force: true);
     removeObserverMobile(this);
     super.didPushNext();
   }
@@ -228,6 +305,9 @@ class _MainAppState extends PopScopeState<MainApp>
     }
     removeObserverMobile(this);
     for (final worker in _nativeTabBarWorkers) {
+      worker.dispose();
+    }
+    for (final worker in _homeTopWorkers) {
       worker.dispose();
     }
     _accountsListener?.cancel();
@@ -334,7 +414,7 @@ class _MainAppState extends PopScopeState<MainApp>
             () => FractionalTranslation(
               translation: Offset(
                 0.0,
-                barOffset.value / Style.topBarHeight,
+                barOffset.value / _mainController.topBarExtent,
               ),
               child: bottomNav,
             ),
@@ -472,8 +552,22 @@ class _MainAppState extends PopScopeState<MainApp>
         : .horizontal;
     // 延伸到竖状态栏下面（iPhone Duo），否则这一层会按让出竖状态栏后的宽度
     // 裁切，页面里左右滑动的内容画不到竖状态栏下面，见 [RailPageViewport]
+    // 顶部安全区由每个页面自己让开：iPhone Duo 展开竖屏时首页要画进状态栏
+    // 那一行（见 [_updateHomeTop]）。各种布局下结构都一样，旋转或展开时页面
+    // 状态不会丢
     final pages = _mainController.navigationBars
-        .map((i) => RailPagePadding(child: i.page))
+        .map(
+          (i) => RailPagePadding(
+            child: Padding(
+              padding: .only(
+                top: i == .home && _mainController.homeTopInStatusBar
+                    ? 0.0
+                    : _padding.top,
+              ),
+              child: i.page,
+            ),
+          ),
+        )
         .toList();
     Widget child = RailPageViewport(
       axis: axis,
@@ -504,7 +598,7 @@ class _MainAppState extends PopScopeState<MainApp>
                 context: context,
                 removeRight: true,
                 child: Padding(
-                  padding: .only(top: _padding.top, left: _padding.left),
+                  padding: .only(left: _padding.left),
                   child: child,
                 ),
               ),
@@ -526,7 +620,7 @@ class _MainAppState extends PopScopeState<MainApp>
           child: bottomNav,
         );
       }
-      padding = _padding.copyWith(bottom: 0);
+      padding = _padding.copyWith(top: 0, bottom: 0);
     } else {
       sideBar = DecoratedBox(
         decoration: BoxDecoration(
@@ -538,7 +632,7 @@ class _MainAppState extends PopScopeState<MainApp>
         ),
         child: _sideBar(),
       );
-      padding = .only(top: _padding.top, right: _padding.right);
+      padding = .only(right: _padding.right);
     }
 
     child = Material(

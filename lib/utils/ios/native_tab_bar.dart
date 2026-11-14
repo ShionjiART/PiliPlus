@@ -189,7 +189,8 @@ abstract final class IOSNativeTabBar {
       );
 
   /// 状态栏在竖状态栏中时（iPhone Duo）隐藏状态栏，让页面铺满竖状态栏的位置。
-  /// 状态栏在顶部时不生效。
+  /// 状态栏在顶部时不生效，此时用 [statusBar] 隐藏顶部的状态栏（iPhone Duo
+  /// 展开竖屏时的视频页）。
   ///
   /// 每次都发给原生层，不按上次的值去重：原生层可能漏掉或重置过状态，重发能让
   /// 两边重新一致。原生层回复当前是否已隐藏，用它校正 [verticalBarHidden]，
@@ -197,10 +198,13 @@ abstract final class IOSNativeTabBar {
   ///
   /// 这是全局状态，以最后一次调用为准。页面不要直接调用，用
   /// [claimVerticalBar] 和 [releaseVerticalBar]
-  static void setHidesVerticalBar(bool hides) {
+  static void setHidesVerticalBar(bool hides, {bool statusBar = false}) {
     if (!Platform.isIOS) return;
     _channel
-        .invokeMethod<bool>('setHidesVerticalBar', hides)
+        .invokeMethod<bool>('setHidesVerticalBar', {
+          'hides': hides,
+          'statusBar': statusBar,
+        })
         .then(
           (hidden) {
             if (hidden != null) verticalBarHidden.value = hidden;
@@ -212,20 +216,40 @@ abstract final class IOSNativeTabBar {
   }
 
   static final _verticalBarOwner = VerticalBarOwner(
-    onChanged: setHidesVerticalBar,
+    onChanged: (hides) =>
+        setHidesVerticalBar(hides, statusBar: hides && _ownerHidesStatusBar),
     schedule: (callback) {
       WidgetsBinding.instance.addPostFrameCallback((_) => callback());
       WidgetsBinding.instance.ensureVisualUpdate();
     },
   );
 
-  /// [page] 在最上层、要隐藏竖状态栏时调用（视频页），见 [VerticalBarOwner]
-  static void claimVerticalBar(Object page) => _verticalBarOwner.claim(page);
+  /// 最后接管竖状态栏的页面是否还要隐藏顶部的状态栏
+  static bool _ownerHidesStatusBar = false;
+
+  /// [page] 在最上层、要隐藏竖状态栏时调用（视频页），见 [VerticalBarOwner]。
+  /// [statusBar] 同 [setHidesVerticalBar]
+  static void claimVerticalBar(Object page, {bool statusBar = false}) {
+    _ownerHidesStatusBar = statusBar;
+    _verticalBarOwner.claim(page);
+  }
 
   /// [page] 被弹出、被盖住或销毁时调用。只有它仍在隐藏竖状态栏、且这一帧之后
-  /// 没有别的页面接着隐藏时，才恢复显示
+  /// 没有别的页面接着隐藏时，才恢复显示（顶部的状态栏也一起恢复）
   static void releaseVerticalBar(Object page) =>
       _verticalBarOwner.release(page);
+
+  static bool? _mainHidesStatusBar;
+
+  /// 首页顶栏收起时隐藏顶部的状态栏（iPhone Duo 展开竖屏）。和
+  /// [setHidesVerticalBar] 的状态分开保存，其他页面打开或返回时不会互相覆盖。
+  /// 滚动时每帧都会调用，值没变就不发；打开、返回页面和切换布局时用 [force]
+  /// 重发，以防两边不一致
+  static void setMainHidesStatusBar(bool hides, {bool force = false}) {
+    if (!Platform.isIOS || (!force && hides == _mainHidesStatusBar)) return;
+    _mainHidesStatusBar = hides;
+    _channel.invokeMethod('setMainHidesStatusBar', hides).ignore();
+  }
 
   // ---------------------------------------------------------------------------
   // 竖状态栏里的页面按钮（iPhone Duo）：二级页面的返回键，以及页面自己注册的按钮。

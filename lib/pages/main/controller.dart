@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/view_safe_area.dart';
 import 'package:PiliPlus/grpc/dyn.dart';
 import 'package:PiliPlus/http/loading_state.dart';
@@ -42,6 +43,16 @@ class MainController extends GetxController
   bool useStatusBarNav = false;
   // iOS 26+ iPhone：主导航由系统液态玻璃标签栏绘制
   bool useNativeTabBar = false;
+
+  /// iPhone Duo 展开竖屏：状态栏在顶部右侧，首页把头像、搜索和消息放进状态栏
+  /// 那一行，上滑时连同状态栏一起收起（见 [HomePage]）
+  bool homeTopInStatusBar = false;
+
+  /// [homeTopInStatusBar] 时顶部状态栏那一行的高度
+  double homeTopHeight = 0;
+
+  /// 首页顶栏能收起的高度，即 [barOffset] 的最大值
+  double topBarExtent = Style.topBarHeight;
   late dynamic controller;
   final RxInt selectedIndex = 0.obs;
 
