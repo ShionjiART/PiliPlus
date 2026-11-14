@@ -52,6 +52,7 @@
 - [x] 离线缓存的 HDR、杜比视界视频也用系统播放器播放（[#36](https://github.com/ShionjiART/PiliPlus/pull/36)）
 - [x] 「所有视频」模式下尽量都用系统播放器（包括普通画质的 HEVC 和离线缓存）；系统播放器加载超时或没有画面时自动切回内置播放器（[#38](https://github.com/ShionjiART/PiliPlus/pull/38)）
 - [x] 修复系统播放器超过 2 倍速时一直显示「加载中」、一卡一卡：使用系统播放器时倍速最高 2 倍，倍速菜单和长按倍速都封顶 2 倍（[#49](https://github.com/ShionjiART/PiliPlus/pull/49)）
+- [x] 修复系统播放器快速切换分集或画质时，悄悄改用内置播放器或一直转圈；系统播放器出错退回内置播放器时，保持原来的播放或暂停状态；切回内置播放器后恢复 2 倍以上的倍速；缓冲卡住时进度不再往前走（[#54](https://github.com/ShionjiART/PiliPlus/pull/54)）
 - [x] 修复打开视频偶尔整块黑屏或有声音没画面（原版也有，见 [bggRGjQaUbCoE/PiliPlus#3246](https://github.com/bggRGjQaUbCoE/PiliPlus/issues/3246)）：被盖住或已关闭的视频页不再抢用播放器，初始化失败时显示封面可点击重试（[#16](https://github.com/ShionjiART/PiliPlus/pull/16)）
 
 ## 离线缓存
