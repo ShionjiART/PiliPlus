@@ -110,14 +110,16 @@ final class NativeTabBarController: UITabBarController, UITabBarControllerDelega
   private func makeHost() -> FlutterHostViewController {
     let host = FlutterHostViewController()
     host.onSafeAreaChange = { [weak self, weak host] insets in
-      guard let self else { return }
+      // A host outside the window (a tab that is not shown yet, when embed()
+      // moves Flutter into it) reports all zeros, and Dart would lay out one
+      // frame without the safe area. The real insets follow once the host is
+      // in the window (viewIsAppearing / viewSafeAreaInsetsDidChange).
+      guard let self, let window = host?.view.window else { return }
       var insets = insets
       // iPhone Duo: UIKit moves the navigation bar into the vertical bar but
       // still adds its height to the top safe area. Nothing is drawn there, so
       // keep the window's own top inset and the page does not move down.
-      if let window = host?.view.window {
-        insets.top = min(insets.top, window.safeAreaInsets.top)
-      }
+      insets.top = min(insets.top, window.safeAreaInsets.top)
       // iPhone Duo: while the status bar sits in the vertical bar on the side,
       // nothing is shown at the top edge, but a real device can still report a
       // top inset (about 20pt; the simulator reports 0), which left an empty
@@ -513,8 +515,18 @@ final class NativePageNavigationController: UINavigationController {
     avatarURL = url
     if item.image == nil, let placeholder { item.image = UIImage(systemName: placeholder) }
     guard let source = URL(string: url) else { return }
-    avatarTask = URLSession.shared.dataTask(with: source) { [weak self, weak item] data, _, _ in
-      guard let data, let image = UIImage(data: data) else { return }
+    avatarTask = URLSession.shared.dataTask(with: source) { [weak self, weak item] data, _, error in
+      guard let data, let image = UIImage(data: data) else {
+        // Cancelled: a newer request took over and cleared avatarURL itself.
+        if (error as? URLError)?.code == .cancelled { return }
+        // Forget the address so the next setTools tries it again; otherwise
+        // the placeholder stays until the address changes.
+        DispatchQueue.main.async {
+          guard let self, self.avatarURL == url else { return }
+          self.avatarURL = nil
+        }
+        return
+      }
       // Nearly fills the round glass button (about 48pt), leaving a thin ring,
       // so the photo reads as large as the search and notification icons.
       let size = CGSize(width: Self.avatarSide, height: Self.avatarSide)
@@ -799,6 +811,15 @@ final class FlutterHostViewController: UIViewController {
 
   override func viewSafeAreaInsetsDidChange() {
     super.viewSafeAreaInsetsDidChange()
+    if !children.isEmpty { onSafeAreaChange?(view.safeAreaInsets) }
+  }
+
+  /// In the window with up-to-date insets, before the tab is first drawn.
+  /// embed() skips its report while the host is outside the window, and the
+  /// insets need not change on the way in, so report them here as well; the
+  /// tab bar controller drops values it has already sent.
+  override func viewIsAppearing(_ animated: Bool) {
+    super.viewIsAppearing(animated)
     if !children.isEmpty { onSafeAreaChange?(view.safeAreaInsets) }
   }
 }
