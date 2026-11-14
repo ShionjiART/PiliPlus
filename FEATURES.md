@@ -18,6 +18,7 @@
 - [x] 合上时播放器底部的进度条铺满整行（摄像头只在竖栏顶部，挡不到），下面一排按钮仍避开竖栏，合上全屏也一样（[#35](https://github.com/ShionjiART/PiliPlus/pull/35)）。控件隐藏时的细进度条起初改成避开竖栏（[#24](https://github.com/ShionjiART/PiliPlus/pull/24)），后来改回铺满（[#35](https://github.com/ShionjiART/PiliPlus/pull/35)）
 - [x] 合上时播放器的锁定按钮、截图按钮和下面一排按钮也和进度条一样铺到竖栏上，不再空出一截（摄像头只在竖栏顶部，挡不到）；普通 iPhone 横屏时仍避开灵动岛（[#48](https://github.com/ShionjiART/PiliPlus/pull/48)）
 - [x] 视频页隐藏时间和 Wi-Fi，内容铺满竖状态栏的位置（合上和展开都是）
+- [x] 展开竖屏时视频页也隐藏顶部的时间和 Wi-Fi，播放器铺到屏幕最上面，不再留一条黑边，和合上、横屏时一致（[#52](https://github.com/ShionjiART/PiliPlus/pull/52)）
 - [x] 视频页的对话框（播放信息等）在整个屏幕里居中，不再往左上偏：竖状态栏隐藏时不再让开它，上下也留出相同的边距，较高的对话框不会碰到摄像头（[#48](https://github.com/ShionjiART/PiliPlus/pull/48)）
 - [x] 展开后视频页右栏加宽，相关视频的 ⋮ 按钮不再被遮住
 - [x] 动态流合上时单列、展开时双列，不再因为合上状态启动就一直是单列（[#23](https://github.com/ShionjiART/PiliPlus/pull/23)）
@@ -33,6 +34,7 @@
 - [x] 视频页的底部弹窗（长按评论的菜单、分享、收藏、缓存、转发、播放器设置等）和页面一样铺满竖状态栏的位置，右边不再留出一条（[#25](https://github.com/ShionjiART/PiliPlus/pull/25)）
 - [x] 动态详情页的点赞、评论、分享、转发放进竖状态栏，带简短的数量（1.2万、1千万、1.2亿）；发评论单独一个按钮放在最下面，代替页面上的悬浮按钮；底部操作栏保留（[#26](https://github.com/ShionjiART/PiliPlus/pull/26)）。后来顺序改为点赞、评论、转发（带数量）、分享（只有图标），按钮变矮，通话时也不会被收进 ⋯ 菜单（[#33](https://github.com/ShionjiART/PiliPlus/pull/33)）
 - [x] Duo 上首页顶部的搜索栏、消息按钮和头像那一行去掉（都已在竖状态栏里），分区标签移到最上面（[#27](https://github.com/ShionjiART/PiliPlus/pull/27)）
+- [x] 展开竖屏时首页的头像、搜索栏和消息按钮放进顶部状态栏那一行（右边让开时间和 Wi-Fi），和 B 站官方客户端一样；往上滑时这一行连同状态栏一起收起，分区标签移到最上面，往下滑再出现（[#52](https://github.com/ShionjiART/PiliPlus/pull/52)）
 - [x] 二级页面只保留竖状态栏里的返回键，页面左上角的去掉，标题和左边留出间距；竖状态栏的头像点了弹出账号切换，未登录时去「我的」页面登录（[#28](https://github.com/ShionjiART/PiliPlus/pull/28)）
 - [x] 合上时首页、「我的」等页面顶部不再多出一段空白：状态栏在竖栏里时，不再给屏幕顶部留位置（[#31](https://github.com/ShionjiART/PiliPlus/pull/31)）
 - [x] 在账号切换里选了匿名后，点竖栏头像仍弹出账号切换，可以切回原账号；一个账号都没有时才去「我的」登录。竖栏头像图片放大，留白收窄（[#32](https://github.com/ShionjiART/PiliPlus/pull/32)）
