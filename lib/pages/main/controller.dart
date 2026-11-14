@@ -37,7 +37,7 @@ class MainController extends GetxController
   RxBool? showBottomBar;
   late final bool hideBottomBar;
   late final barHideType = Pref.barHideType;
-  bool useBottomNav = false;
+  bool useBottomNav = true;
   // iPhone Duo：导航放在右侧系统状态栏中
   bool useStatusBarNav = false;
   // iOS 26+ iPhone：主导航由系统液态玻璃标签栏绘制
