@@ -9,8 +9,8 @@ import 'package:PiliPlus/common/widgets/flutter/text_field/controller.dart';
 import 'package:PiliPlus/common/widgets/gesture/horizontal_drag_gesture_recognizer.dart';
 import 'package:PiliPlus/common/widgets/pair.dart';
 import 'package:PiliPlus/common/widgets/refresh_indicator.dart';
+import 'package:PiliPlus/common/widgets/scaffold/floating_app_bar_scaffold.dart';
 import 'package:PiliPlus/common/widgets/scaffold/mini_scaffold.dart';
-import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
 import 'package:PiliPlus/common/widgets/scroll_behavior.dart'
     show NoOverscrollIndicator;
 import 'package:PiliPlus/common/widgets/scroll_physics.dart'
@@ -261,42 +261,18 @@ class _DynamicDetailPageState extends CommonDynPageMultiState<DynamicDetailPage>
     // 标签栏滑到顶时停在顶栏下面（见 [_buildPortrait]）
     _floatingAppBar =
         isPortrait && IOSNativeTabBar.hidesPageBackButton(context);
-    Widget body = Padding(
-      padding: EdgeInsets.only(left: padding.left, right: padding.right),
-      child: _buildBody(),
-    );
-    if (_floatingAppBar) {
-      body = Stack(
-        children: [
-          Padding(
-            padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top),
-            child: body,
-          ),
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: Obx(() {
-              final showTitle = controller.showTitle.value;
-              return IgnorePointer(
-                ignoring: !showTitle,
-                child: AnimatedOpacity(
-                  opacity: showTitle ? 1 : 0,
-                  duration: const Duration(milliseconds: 300),
-                  child: _buildAppBar(),
-                ),
-              );
-            }),
-          ),
-        ],
-      );
-    }
     return SelectionTapRegionSurface(
       /// apply `lib/scripts/scrollable.patch`
       isScrolling: () => _scrollable?.shouldIgnorePointer ?? false,
-      child: SimpleScaffold(
-        appBar: _floatingAppBar ? null : _buildAppBar(),
-        body: body,
+      // 开合时 [_floatingAppBar] 会变，树的结构保持不变，滚动位置不丢
+      child: FloatingAppBarScaffold(
+        floating: _floatingAppBar,
+        showFloatingAppBar: controller.showTitle,
+        appBarBuilder: _buildAppBar,
+        body: Padding(
+          padding: EdgeInsets.only(left: padding.left, right: padding.right),
+          child: _buildBody(),
+        ),
         fab: SlideTransition(
           position: fabAnimation,
           child: _buildBottom(),
@@ -606,7 +582,8 @@ class _DynamicDetailPageState extends CommonDynPageMultiState<DynamicDetailPage>
         headerSliverBuilder: (context, innerBoxIsScrolled) {
           return [
             _buildDynPanel(),
-            if (_floatingAppBar) const SliverPinnedGap(extent: kToolbarHeight),
+            // 一直保留，不浮动时高度为 0，免得开合时头部的结构变化
+            SliverPinnedGap(extent: _floatingAppBar ? kToolbarHeight : 0),
           ];
         },
         body: Column(
