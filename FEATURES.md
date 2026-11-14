@@ -36,6 +36,7 @@
 - [x] 二级页面只保留竖状态栏里的返回键，页面左上角的去掉，标题和左边留出间距；竖状态栏的头像点了弹出账号切换，未登录时去「我的」页面登录（[#28](https://github.com/ShionjiART/PiliPlus/pull/28)）
 - [x] 合上时首页、「我的」等页面顶部不再多出一段空白：状态栏在竖栏里时，不再给屏幕顶部留位置（[#31](https://github.com/ShionjiART/PiliPlus/pull/31)）
 - [x] 在账号切换里选了匿名后，点竖栏头像仍弹出账号切换，可以切回原账号；一个账号都没有时才去「我的」登录。竖栏头像图片放大，留白收窄（[#32](https://github.com/ShionjiART/PiliPlus/pull/32)）
+- [x] 竖栏头像加载失败后会重新加载，不再一直显示占位图；切换底部标签时页面不再闪一下（[#55](https://github.com/ShionjiART/PiliPlus/pull/55)）
 - [x] 动态详情页顶部不再空出一条：作者直接在最上面，往上滑过作者后顶栏才浮出来，标签栏停在顶栏下面（[#33](https://github.com/ShionjiART/PiliPlus/pull/33)）
 - [x] 音乐详情页顶部也不再空出一条：歌曲卡片直接在最上面，往上滑过后顶栏才浮出来，评论栏停在顶栏下面（[#41](https://github.com/ShionjiART/PiliPlus/pull/41)）
 - [x] 合上时视频页暂停后往上滑、播放器收成一条工具栏，右边的 ⋮ 不再被摄像头挡住：按钮和播放器控件一样避开左右安全区（[#40](https://github.com/ShionjiART/PiliPlus/pull/40)）
@@ -49,6 +50,7 @@
 - [x] 可选所有视频都用系统播放器（实验性）（[#12](https://github.com/ShionjiART/PiliPlus/pull/12)）
 - [x] 系统播放器支持画中画、截图和字幕（[#13](https://github.com/ShionjiART/PiliPlus/pull/13)）
 - [x] 修复部分 HDR 真彩、杜比视界视频无法用系统播放器播放，或在播放信息里显示成 SDR（[#13](https://github.com/ShionjiART/PiliPlus/pull/13)）
+- [x] 修复 CDN 返回不完整的数据时系统播放器让 App 闪退，现在会改用内置播放器（[#55](https://github.com/ShionjiART/PiliPlus/pull/55)）
 - [x] 离线缓存的 HDR、杜比视界视频也用系统播放器播放（[#36](https://github.com/ShionjiART/PiliPlus/pull/36)）
 - [x] 「所有视频」模式下尽量都用系统播放器（包括普通画质的 HEVC 和离线缓存）；系统播放器加载超时或没有画面时自动切回内置播放器（[#38](https://github.com/ShionjiART/PiliPlus/pull/38)）
 - [x] 修复系统播放器超过 2 倍速时一直显示「加载中」、一卡一卡：使用系统播放器时倍速最高 2 倍，倍速菜单和长按倍速都封顶 2 倍（[#49](https://github.com/ShionjiART/PiliPlus/pull/49)）
