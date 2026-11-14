@@ -130,7 +130,46 @@ final class NativeTabBarController: UITabBarController, UITabBarControllerDelega
       self.safeArea = insets
       self.channel?.invokeMethod("safeArea", arguments: Self.encode(insets))
     }
+    host.onLayout = { [weak self, weak host] in
+      guard let self, let view = host?.view else { return }
+      self.updateTopBarRegion(view)
+    }
     return host
+  }
+
+  // iPhone Duo unfolded in portrait: the status bar sits only in the top-right
+  // corner, and the system reserves just that corner. The home page puts its
+  // own row of buttons in the rest of the status bar row, at the place UIKit
+  // gives for a top bar, so nothing is hard-coded to a particular device.
+  private static let topBarExtent: CGFloat = 44
+  private var topBarRegion: [String: Double]?
+
+  private func updateTopBarRegion(_ view: UIView) {
+    #if compiler(>=6.4)
+      if #available(iOS 27.1, *) {
+        guard let window = view.window else { return }
+        // Pages hide the status bar (the video page, the home page while its
+        // top bar is scrolled away); then the corner is not reserved. Keep the
+        // values from when it was shown so the layout does not jump.
+        if window.windowScene?.statusBarManager?.isStatusBarHidden ?? false { return }
+        var region: [String: Double]?
+        let width = view.bounds.width
+        let topCorner = view.reservedRegions(kind: .occlusion).contains {
+          $0.frame.minY <= 0 && $0.frame.height > 0 && $0.frame.width < width / 2
+        }
+        if traitCollection.verticalBarEdge == .unspecified && topCorner {
+          let bar = view.edgeInsets(for: .bar(onEdge: UIRectEdge.top, extent: Self.topBarExtent))
+          region = [
+            "height": min(view.safeAreaInsets.top, window.safeAreaInsets.top),
+            "top": bar.top, "left": bar.left, "right": bar.right,
+            "extent": Self.topBarExtent,
+          ]
+        }
+        guard region != topBarRegion else { return }
+        topBarRegion = region
+        channel?.invokeMethod("topBarRegion", arguments: region)
+      }
+    #endif
   }
 
   private static func encode(_ insets: UIEdgeInsets) -> [String: Double] {
@@ -156,6 +195,8 @@ final class NativeTabBarController: UITabBarController, UITabBarControllerDelega
       result(nil)
     case "getSafeArea":
       result(Self.encode(safeArea))
+    case "getTopBarRegion":
+      result(topBarRegion)
     case "getBackAvailable":
       result(navigationHost?.backAvailable ?? false)
     case "setTabs":
@@ -825,6 +866,14 @@ final class FlutterHostViewController: UIViewController {
   /// The Flutter view reports no safe area when it is not the window's root
   /// controller, so the tab bar controller forwards this one to Dart.
   var onSafeAreaChange: ((UIEdgeInsets) -> Void)?
+
+  /// Reserved regions are only known after layout.
+  var onLayout: (() -> Void)?
+
+  override func viewDidLayoutSubviews() {
+    super.viewDidLayoutSubviews()
+    if !children.isEmpty { onLayout?() }
+  }
 
   override func viewSafeAreaInsetsDidChange() {
     super.viewSafeAreaInsetsDidChange()
