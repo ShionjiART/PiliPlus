@@ -57,6 +57,7 @@ import 'package:PiliPlus/plugin/pl_player/view/view.dart';
 import 'package:PiliPlus/services/service_locator.dart';
 import 'package:PiliPlus/services/shutdown_timer_service.dart'
     show shutdownTimerService;
+import 'package:PiliPlus/utils/ios/foldable_helper.dart';
 import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/android/bindings.g.dart';
@@ -379,19 +380,34 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
   bool _isOnTop = false;
 
   void _updateVerticalBar() {
-    IOSNativeTabBar.setHidesVerticalBar(_isOnTop);
+    IOSNativeTabBar.setHidesVerticalBar(
+      _isOnTop,
+      statusBar: _isOnTop && _fillTop,
+    );
   }
+
+  /// iPhone Duo 展开竖屏：状态栏在顶部，视频页隐藏它，播放器铺满顶部，
+  /// 和合上竖屏、展开横屏隐藏竖状态栏一样。内屏顶部没有摄像头，状态栏隐藏后
+  /// 那里什么都没有，播放器上的按钮也不用让开
+  bool _fillTop = false;
 
   void _onVerticalBarHidden() {
     if (mounted) setState(_updatePadding);
   }
 
   void _updatePadding() {
+    _fillTop = false;
     if (videoDetailController.removeSafeArea) {
       padding = .zero;
       return;
     }
     padding = MediaQuery.viewPaddingOf(context);
+    if (IOSFoldableHelper.isIPhone &&
+        isPortrait &&
+        min(maxWidth, maxHeight) >= 600) {
+      _fillTop = true;
+      padding = padding.copyWith(top: 0);
+    }
     // 竖状态栏隐藏后横屏布局铺满它的位置。竖屏（合上）时摄像头在竖状态栏中，
     // 只让播放器下方的内容铺满，见 childWhenDisabled
     if (!isPortrait && IOSNativeTabBar.verticalBarHidden.value) {
@@ -449,6 +465,11 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     super.didPopNext();
     _isOnTop = true;
     _updateVerticalBar();
+    // 返回时被关闭页面的 didPop 在这之后调用，会把状态栏的设置改回去，
+    // 下一帧再发一次
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _isOnTop) _updateVerticalBar();
+    });
 
     if (videoDetailController.plPlayerController.isCloseAll) {
       return;

@@ -194,10 +194,19 @@ final class NativeTabBarController: UITabBarController, UITabBarControllerDelega
       setTabBarHidden(call.arguments as? Bool ?? false, animated: true)
       result(nil)
     case "setHidesVerticalBar":
-      hidesVerticalBar = call.arguments as? Bool ?? false
+      if let args = call.arguments as? [String: Any] {
+        pageHidesStatusBar = args["statusBar"] as? Bool ?? false
+        hidesVerticalBar = args["hides"] as? Bool ?? false
+      } else {
+        pageHidesStatusBar = false
+        hidesVerticalBar = call.arguments as? Bool ?? false
+      }
       // Reply with the actual state so Dart can correct itself if it missed a
       // `verticalBarHidden` notification.
       result(isVerticalBarHidden)
+    case "setMainHidesStatusBar":
+      mainHidesStatusBar = call.arguments as? Bool ?? false
+      result(nil)
     default:
       result(FlutterMethodNotImplemented)
     }
@@ -275,12 +284,32 @@ final class NativeTabBarController: UITabBarController, UITabBarControllerDelega
     }
   }
 
+  // iPhone Duo unfolded in portrait: the status bar is at the top. The video
+  // page hides it so the player fills the top edge (sent together with
+  // `setHidesVerticalBar`), and the home page hides it while its top bar is
+  // scrolled away. Kept apart so a page being pushed or popped over the home
+  // page cannot overwrite the home page's state.
+  private var pageHidesStatusBar = false {
+    didSet { if pageHidesStatusBar != oldValue { statusBarDidChange() } }
+  }
+  private var mainHidesStatusBar = false {
+    didSet { if mainHidesStatusBar != oldValue { statusBarDidChange() } }
+  }
+
+  private func statusBarDidChange() {
+    UIView.animate(withDuration: 0.25) { self.setNeedsStatusBarAppearanceUpdate() }
+  }
+
+  private var isStatusBarHidden: Bool {
+    isVerticalBarHidden || pageHidesStatusBar || mainHidesStatusBar
+  }
+
   override var childForStatusBarHidden: UIViewController? {
-    isVerticalBarHidden ? nil : super.childForStatusBarHidden
+    isStatusBarHidden ? nil : super.childForStatusBarHidden
   }
 
   override var prefersStatusBarHidden: Bool {
-    isVerticalBarHidden ? true : super.prefersStatusBarHidden
+    isStatusBarHidden ? true : super.prefersStatusBarHidden
   }
 
   override func viewDidLayoutSubviews() {

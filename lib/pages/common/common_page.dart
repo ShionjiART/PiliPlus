@@ -1,4 +1,3 @@
-import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/pages/home/controller.dart';
 import 'package:PiliPlus/pages/main/controller.dart';
 import 'package:flutter/foundation.dart' show clampDouble;
@@ -58,7 +57,7 @@ abstract class CommonPageState<T extends StatefulWidget> extends State<T> {
     _barOffset!.value = clampDouble(
       _barOffset!.value + scrollDelta,
       0.0,
-      Style.topBarHeight,
+      _mainController.topBarExtent,
     );
   }
 
@@ -78,7 +77,7 @@ abstract class CommonPageState<T extends StatefulWidget> extends State<T> {
         final newValue = clampDouble(
           value + scrollDelta,
           0.0,
-          Style.topBarHeight,
+          _mainController.topBarExtent,
         );
         final offset = value - newValue;
         if (offset != 0) {
