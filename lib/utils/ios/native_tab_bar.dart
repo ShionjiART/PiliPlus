@@ -184,15 +184,19 @@ abstract final class IOSNativeTabBar {
       );
 
   /// 状态栏在竖状态栏中时（iPhone Duo）隐藏状态栏，让页面铺满竖状态栏的位置。
-  /// 状态栏在顶部时不生效。
+  /// 状态栏在顶部时不生效，此时用 [statusBar] 隐藏顶部的状态栏（iPhone Duo
+  /// 展开竖屏时的视频页）。
   ///
   /// 每次都发给原生层，不按上次的值去重：原生层可能漏掉或重置过状态，重发能让
   /// 两边重新一致。原生层回复当前是否已隐藏，用它校正 [verticalBarHidden]，
   /// 以防错过某次 `verticalBarHidden` 通知
-  static void setHidesVerticalBar(bool hides) {
+  static void setHidesVerticalBar(bool hides, {bool statusBar = false}) {
     if (!Platform.isIOS) return;
     _channel
-        .invokeMethod<bool>('setHidesVerticalBar', hides)
+        .invokeMethod<bool>('setHidesVerticalBar', {
+          'hides': hides,
+          'statusBar': statusBar,
+        })
         .then(
           (hidden) {
             if (hidden != null) verticalBarHidden.value = hidden;
@@ -201,6 +205,18 @@ abstract final class IOSNativeTabBar {
             // 没有原生标签栏容器（iOS 26 以下）
           },
         );
+  }
+
+  static bool? _mainHidesStatusBar;
+
+  /// 首页顶栏收起时隐藏顶部的状态栏（iPhone Duo 展开竖屏）。和
+  /// [setHidesVerticalBar] 的状态分开保存，其他页面打开或返回时不会互相覆盖。
+  /// 滚动时每帧都会调用，值没变就不发；打开、返回页面和切换布局时用 [force]
+  /// 重发，以防两边不一致
+  static void setMainHidesStatusBar(bool hides, {bool force = false}) {
+    if (!Platform.isIOS || (!force && hides == _mainHidesStatusBar)) return;
+    _mainHidesStatusBar = hides;
+    _channel.invokeMethod('setMainHidesStatusBar', hides).ignore();
   }
 
   // ---------------------------------------------------------------------------
