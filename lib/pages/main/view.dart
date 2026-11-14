@@ -475,30 +475,23 @@ class _MainAppState extends PopScopeState<MainApp>
         : .horizontal;
     // 延伸到竖状态栏下面（iPhone Duo），否则这一层会按让出竖状态栏后的宽度
     // 裁切，页面里左右滑动的内容画不到竖状态栏下面，见 [RailPageViewport]
+    final pages = _mainController.navigationBars
+        .map((i) => RailPagePadding(child: i.page))
+        .toList();
     Widget child = RailPageViewport(
       axis: axis,
-      builder: (right) {
-        final pages = _mainController.navigationBars
-            .map(
-              (i) => Padding(
-                padding: EdgeInsets.only(right: right),
-                child: i.page,
-              ),
+      child: _mainController.mainTabBarView
+          ? TabBarView(
+              controller: _mainController.controller,
+              physics: const NeverScrollableScrollPhysics(),
+              scrollDirection: axis,
+              children: pages,
             )
-            .toList();
-        return _mainController.mainTabBarView
-            ? TabBarView(
-                controller: _mainController.controller,
-                physics: const NeverScrollableScrollPhysics(),
-                scrollDirection: axis,
-                children: pages,
-              )
-            : PageView(
-                controller: _mainController.controller,
-                physics: const NeverScrollableScrollPhysics(),
-                children: pages,
-              );
-      },
+          : PageView(
+              controller: _mainController.controller,
+              physics: const NeverScrollableScrollPhysics(),
+              children: pages,
+            ),
     );
     child = KeyedSubtree(key: _bodyKey, child: child);
 
