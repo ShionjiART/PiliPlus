@@ -36,6 +36,12 @@ abstract final class IOSNativeTabBar {
   /// 由原生层转发；为 null 时使用 Flutter 自己的值
   static final safeArea = ValueNotifier<EdgeInsets?>(null);
 
+  /// iPhone Duo 展开竖屏时状态栏只占顶部右上角，这一行其余的地方可以放
+  /// 页面自己的顶栏（首页的头像、搜索和消息）。位置是系统给的：
+  /// `UIView.edgeInsets(for: .bar(onEdge: .top, extent:))`，右边让开系统
+  /// 保留的状态栏区域。其他时候为 null
+  static final topBarRegion = ValueNotifier<TopBarRegion?>(null);
+
   /// 侧边安全区达到这个宽度（原生 pt）时就是竖状态栏，和 SceneDelegate 的
   /// 判断一致；普通 iPhone 横屏时灵动岛那一侧最多约 62pt
   static const double verticalBarMinInset = 72;
@@ -48,6 +54,8 @@ abstract final class IOSNativeTabBar {
           _onSelect?.call(call.arguments as int);
         case 'safeArea':
           _setSafeArea(call.arguments);
+        case 'topBarRegion':
+          topBarRegion.value = TopBarRegion.fromMap(call.arguments);
         case 'verticalBarHidden':
           verticalBarHidden.value = call.arguments as bool;
         case 'back':
@@ -72,6 +80,9 @@ abstract final class IOSNativeTabBar {
     });
     try {
       _setSafeArea(await _channel.invokeMethod('getSafeArea'));
+      topBarRegion.value = TopBarRegion.fromMap(
+        await _channel.invokeMethod('getTopBarRegion'),
+      );
       // 原生层在 Flutter 准备好之前可能已经发过通知
       backAvailable.value =
           await _channel.invokeMethod<bool>('getBackAvailable') ?? false;
@@ -336,4 +347,47 @@ class NativeSafeArea extends StatelessWidget {
 class NativeBackScope extends InheritedNotifier<ValueNotifier<bool>> {
   NativeBackScope({super.key, required super.child})
     : super(notifier: IOSNativeTabBar.backAvailable);
+}
+
+/// 状态栏那一行里能放顶栏的位置，见 [IOSNativeTabBar.topBarRegion]
+@immutable
+class TopBarRegion {
+  const TopBarRegion({
+    required this.height,
+    required this.padding,
+    required this.extent,
+  });
+
+  /// 状态栏那一行的高度（状态栏显示时的顶部安全区）
+  final double height;
+
+  /// 顶栏在这一行里的位置：上边距，以及左右避开圆角和状态栏的距离
+  final EdgeInsets padding;
+
+  /// 顶栏的高度
+  final double extent;
+
+  static TopBarRegion? fromMap(Object? value) {
+    if (value is! Map) return null;
+    double get(String key) => (value[key] as num?)?.toDouble() ?? 0;
+    return TopBarRegion(
+      height: get('height'),
+      padding: EdgeInsets.only(
+        top: get('top'),
+        left: get('left'),
+        right: get('right'),
+      ),
+      extent: get('extent'),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is TopBarRegion &&
+      other.height == height &&
+      other.padding == padding &&
+      other.extent == extent;
+
+  @override
+  int get hashCode => Object.hash(height, padding, extent);
 }

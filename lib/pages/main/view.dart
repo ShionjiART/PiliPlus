@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math' show max;
 
 import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/floating_navigation_bar.dart';
@@ -66,6 +65,7 @@ class _MainAppState extends PopScopeState<MainApp>
     }
     if (Platform.isIOS) {
       _attachNativeTabBar();
+      IOSNativeTabBar.topBarRegion.addListener(_onTopBarRegion);
       if (IOSFoldableHelper.isIPhone && _mainController.hasHome) {
         final showTopBar = _mainController.homeController.showTopBar;
         _homeTopWorkers.addAll([
@@ -224,31 +224,26 @@ class _MainAppState extends PopScopeState<MainApp>
     _updateHomeTop();
   }
 
-  /// iPhone Duo 展开竖屏时状态栏在顶部右侧，左边空着，首页的头像、搜索和
-  /// 消息放进这一行（见 [HomePage]）。普通 iPhone 的最短边不到 600，不会触发
+  /// iPhone Duo 展开竖屏时状态栏只占顶部右上角，首页的头像、搜索和消息放进
+  /// 这一行（见 [HomePage]），位置用系统给的 [IOSNativeTabBar.topBarRegion]。
+  /// 普通 iPhone 的最短边不到 600，不会触发
   void _updateHomeTop() {
     final size = MediaQuery.sizeOf(context);
+    final region = IOSNativeTabBar.topBarRegion.value;
     final homeTop =
+        region != null &&
+        region.height >= region.padding.top + region.extent &&
         IOSFoldableHelper.isIPhone &&
         _mainController.useBottomNav &&
         !_mainController.useStatusBarNav &&
         size.height > size.width &&
         size.shortestSide >= 600;
+    final next = homeTop ? region : null;
     final changed = homeTop != _mainController.homeTopInStatusBar;
-    _mainController.homeTopInStatusBar = homeTop;
-    // 状态栏隐藏后顶部的安全区可能变小，按显示时的高度排版，收起时不会跳动。
-    // 进入时状态栏可能正被视频页隐藏，至少留出搜索栏那一行的高度
-    _mainController.homeTopHeight = homeTop
-        ? max(
-            Style.topBarHeight,
-            changed
-                ? _padding.top
-                : max(_mainController.homeTopHeight, _padding.top),
-          )
-        : 0;
-    _mainController.topBarExtent = homeTop
-        ? _mainController.homeTopHeight
-        : Style.topBarHeight;
+    // 首页监听它，开合、旋转时即使首页自己没有重建也会切换顶栏
+    _mainController
+      ..homeTopBar.value = next
+      ..topBarExtent = next?.height ?? Style.topBarHeight;
     if (changed) {
       // 换了布局，顶栏和底栏重新显示。不能在构建过程中改
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -260,6 +255,11 @@ class _MainAppState extends PopScopeState<MainApp>
         _syncHomeStatusBar(force: true);
       });
     }
+  }
+
+  /// 系统给的顶栏位置晚于布局到达（要等原生层布局完成）
+  void _onTopBarRegion() {
+    if (mounted) setState(_updateNavMode);
   }
 
   @override
@@ -311,6 +311,7 @@ class _MainAppState extends PopScopeState<MainApp>
     for (final worker in _homeTopWorkers) {
       worker.dispose();
     }
+    IOSNativeTabBar.topBarRegion.removeListener(_onTopBarRegion);
     _accountsListener?.cancel();
     if (IOSNativeTabBar.onToolAction == _onTool) {
       IOSNativeTabBar.onToolAction = null;
