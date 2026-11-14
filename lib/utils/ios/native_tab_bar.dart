@@ -9,6 +9,7 @@ import 'package:PiliPlus/utils/ios/native_navigation_batch.dart';
 import 'package:PiliPlus/utils/ios/native_navigation_observer.dart';
 import 'package:PiliPlus/utils/ios/native_page_actions.dart';
 import 'package:PiliPlus/utils/ios/native_tab_tools.dart';
+import 'package:PiliPlus/utils/ios/vertical_bar_owner.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
@@ -110,6 +111,8 @@ abstract final class IOSNativeTabBar {
     } on MissingPluginException {
       _enabled = false;
     }
+    // 接管之前可能已经打开了二级页面（例如从链接启动）
+    if (_enabled && _canGoBack) setHidden(true);
     return _enabled;
   }
 
@@ -124,6 +127,8 @@ abstract final class IOSNativeTabBar {
     }
   }
 
+  /// 由 [navigationObserver] 调用：根页面之上有页面时隐藏，回到根页面时恢复，
+  /// 见 [_onCanGoBackChanged]
   static void setHidden(bool hidden) {
     if (_enabled) _channel.invokeMethod('setHidden', hidden);
   }
@@ -188,7 +193,10 @@ abstract final class IOSNativeTabBar {
   ///
   /// 每次都发给原生层，不按上次的值去重：原生层可能漏掉或重置过状态，重发能让
   /// 两边重新一致。原生层回复当前是否已隐藏，用它校正 [verticalBarHidden]，
-  /// 以防错过某次 `verticalBarHidden` 通知
+  /// 以防错过某次 `verticalBarHidden` 通知。
+  ///
+  /// 这是全局状态，以最后一次调用为准。页面不要直接调用，用
+  /// [claimVerticalBar] 和 [releaseVerticalBar]
   static void setHidesVerticalBar(bool hides) {
     if (!Platform.isIOS) return;
     _channel
@@ -202,6 +210,22 @@ abstract final class IOSNativeTabBar {
           },
         );
   }
+
+  static final _verticalBarOwner = VerticalBarOwner(
+    onChanged: setHidesVerticalBar,
+    schedule: (callback) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => callback());
+      WidgetsBinding.instance.ensureVisualUpdate();
+    },
+  );
+
+  /// [page] 在最上层、要隐藏竖状态栏时调用（视频页），见 [VerticalBarOwner]
+  static void claimVerticalBar(Object page) => _verticalBarOwner.claim(page);
+
+  /// [page] 被弹出、被盖住或销毁时调用。只有它仍在隐藏竖状态栏、且这一帧之后
+  /// 没有别的页面接着隐藏时，才恢复显示
+  static void releaseVerticalBar(Object page) =>
+      _verticalBarOwner.release(page);
 
   // ---------------------------------------------------------------------------
   // 竖状态栏里的页面按钮（iPhone Duo）：二级页面的返回键，以及页面自己注册的按钮。
@@ -240,9 +264,18 @@ abstract final class IOSNativeTabBar {
 
   /// 加到根 Navigator 的 navigatorObservers 上，跟踪当前最上层的页面
   static final navigationObserver = NativeNavigationObserver(
-    onCanGoBackChanged: (value) => _canGoBack = value,
+    onCanGoBackChanged: _onCanGoBackChanged,
     onTopRouteChanged: _pageActions.setTopPage,
   );
+
+  /// 根页面（主页）之上有任何页面时隐藏系统标签栏，回到根页面时恢复。
+  /// 包括不经过 GetX 打开的页面，例如图片查看器（HeroDialogRoute）。
+  /// 弹窗、底部弹出框等不是页面，不隐藏，见 [NativeNavigationObserver]
+  static void _onCanGoBackChanged(bool value) {
+    if (value == _canGoBack) return;
+    _canGoBack = value;
+    setHidden(value);
+  }
 
   static final _pageActions = NativePageActionRegistry(
     onChanged: (state) =>
