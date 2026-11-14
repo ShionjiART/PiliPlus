@@ -740,7 +740,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
           initialValue: plPlayerController.playbackSpeed,
           color: Colors.black.withValues(alpha: 0.8),
           itemBuilder: (context) {
-            return plPlayerController.speedList
+            return plPlayerController.speedOptions
                 .map(
                   (double speed) => PopupMenuItem<double>(
                     height: 35,
@@ -1406,7 +1406,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
                       ),
                       child: Obx(
                         () => Text(
-                          '${plPlayerController.enableAutoLongPressSpeed ? (plPlayerController.longPressStatus.value ? plPlayerController.lastPlaybackSpeed : plPlayerController.playbackSpeed) * 2 : plPlayerController.longPressSpeed}倍速中',
+                          '${plPlayerController.longPressDisplaySpeed}倍速中',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 13,

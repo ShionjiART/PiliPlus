@@ -72,7 +72,7 @@ class PlayerFocus extends StatelessWidget {
 
   void _stepPlaybackSpeed({required bool isIncrease}) {
     final speed = plPlayerController.playbackSpeed;
-    final speedList = plPlayerController.speedList;
+    final speedList = plPlayerController.speedOptions;
     final newSpeed = isIncrease
         ? speedList.where((e) => e > speed).minOrNull
         : speedList.where((e) => e < speed).maxOrNull;

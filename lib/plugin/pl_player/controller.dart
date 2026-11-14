@@ -1487,11 +1487,36 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     }
   }
 
+  /// 系统播放器（AVPlayer）在线播放超过 2 倍速时会反复缓冲、一卡一卡的，
+  /// 所以使用系统播放器时倍速最高 2 倍。
+  static const systemPlayerMaxSpeed = 2.0;
+
+  double _clampSpeed(double speed) =>
+      usingSystemPlayer.value ? min(speed, systemPlayerMaxSpeed) : speed;
+
+  /// 倍速菜单里可选的倍速
+  List<double> get speedOptions => usingSystemPlayer.value
+      ? speedList.where((e) => e <= systemPlayerMaxSpeed).toList()
+      : speedList;
+
+  /// 以 [base] 为当前倍速时，长按使用的倍速
+  double _longPressSpeedFor(double base) =>
+      _clampSpeed(enableAutoLongPressSpeed ? base * 2 : longPressSpeed);
+
+  /// 长按时提示的倍速
+  double get longPressDisplaySpeed => _longPressSpeedFor(
+    longPressStatus.value ? lastPlaybackSpeed : playbackSpeed,
+  );
+
   /// 设置倍速
   Future<void> setPlaybackSpeed(double speed) async {
     lastPlaybackSpeed = playbackSpeed;
+    speed = _clampSpeed(speed);
 
-    if (speed == _engineRate) return;
+    if (speed == _engineRate) {
+      if (!isLive) _playbackSpeed.value = speed;
+      return;
+    }
 
     if (usingSystemPlayer.value) {
       await _systemPlayer!.setRate(speed);
@@ -1659,9 +1684,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       if (playerStatus.isPlaying) {
         longPressStatus.value = val;
         HapticFeedback.lightImpact();
-        await setPlaybackSpeed(
-          enableAutoLongPressSpeed ? playbackSpeed * 2 : longPressSpeed,
-        );
+        await setPlaybackSpeed(_longPressSpeedFor(playbackSpeed));
       }
     } else {
       // if (kDebugMode) debugPrint('$playbackSpeed');
