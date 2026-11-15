@@ -569,7 +569,8 @@ class _MainAppState extends PopScopeState<MainApp>
                     ? 0.0
                     : _padding.top,
               ),
-              child: i.page,
+              // 页面顶边以上不显示：往上收起的首页顶栏不能画进状态栏和灵动岛
+              child: ClipRect(clipper: const _ClipAbove(), child: i.page),
             ),
           ),
         )
@@ -703,4 +704,19 @@ class _MainAppState extends PopScopeState<MainApp>
       ],
     );
   }
+}
+
+/// 只裁掉页面顶边以上的部分。页面在里面让开顶部安全区，原来外层的页面容器从
+/// 状态栏下面开始，会裁掉往上收起的顶栏；现在容器从屏幕顶边开始（iPhone Duo
+/// 展开竖屏时首页要画进状态栏那一行），由这里补上。左右不裁，页面里左右滑动的
+/// 内容要能延伸到竖状态栏下面
+class _ClipAbove extends CustomClipper<Rect> {
+  const _ClipAbove();
+
+  @override
+  Rect getClip(Size size) =>
+      Rect.fromLTRB(-size.width, 0, size.width * 2, size.height * 2);
+
+  @override
+  bool shouldReclip(_ClipAbove oldClipper) => false;
 }
