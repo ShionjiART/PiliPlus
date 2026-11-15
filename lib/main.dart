@@ -124,6 +124,8 @@ void main() async {
       IOSNativeTabBar.onBack = () async => _onBack();
       // 竖状态栏里有返回键时，页面左上角不再重复显示
       AppBar.hideImpliedBackButton = IOSNativeTabBar.hidesPageBackButton;
+      // 展开竖屏时标题栏放进状态栏那一行
+      AppBar.statusBarRowPadding = IOSNativeTabBar.statusBarRowPadding;
       // 视频页的对话框在整个屏幕里居中，不再让开已隐藏的竖状态栏
       DialogRoute.safeAreaBuilder = IOSNativeTabBar.dialogSafeArea;
     }
@@ -345,7 +347,7 @@ class MyApp extends StatelessWidget {
         // 放在下面的 MediaQuery 之内，以覆盖它的内边距
         child = NativeSafeArea(scale: uiScale, child: child!);
       }
-      child = NativeBackScope(child: child!);
+      child = TopBarRegionScope(child: NativeBackScope(child: child!));
     }
     if (uiScale != 1.0) {
       child = MediaQuery(

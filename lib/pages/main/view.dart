@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math' show max;
 
 import 'package:PiliPlus/common/style.dart';
 import 'package:PiliPlus/common/widgets/floating_navigation_bar.dart';
@@ -66,6 +65,7 @@ class _MainAppState extends PopScopeState<MainApp>
     }
     if (Platform.isIOS) {
       _attachNativeTabBar();
+      IOSNativeTabBar.topBarRegion.addListener(_onTopBarRegion);
       if (IOSFoldableHelper.isIPhone && _mainController.hasHome) {
         final showTopBar = _mainController.homeController.showTopBar;
         _homeTopWorkers.addAll([
@@ -224,31 +224,26 @@ class _MainAppState extends PopScopeState<MainApp>
     _updateHomeTop();
   }
 
-  /// iPhone Duo 展开竖屏时状态栏在顶部右侧，左边空着，首页的头像、搜索和
-  /// 消息放进这一行（见 [HomePage]）。普通 iPhone 的最短边不到 600，不会触发
+  /// iPhone Duo 展开竖屏时状态栏只占顶部右上角，首页的头像、搜索和消息放进
+  /// 这一行（见 [HomePage]），位置用系统给的 [IOSNativeTabBar.topBarRegion]。
+  /// 普通 iPhone 的最短边不到 600，不会触发
   void _updateHomeTop() {
     final size = MediaQuery.sizeOf(context);
+    final region = IOSNativeTabBar.topBarRegion.value;
     final homeTop =
+        region != null &&
+        region.height >= region.padding.top + region.extent &&
         IOSFoldableHelper.isIPhone &&
         _mainController.useBottomNav &&
         !_mainController.useStatusBarNav &&
         size.height > size.width &&
         size.shortestSide >= 600;
+    final next = homeTop ? region : null;
     final changed = homeTop != _mainController.homeTopInStatusBar;
-    _mainController.homeTopInStatusBar = homeTop;
-    // 状态栏隐藏后顶部的安全区可能变小，按显示时的高度排版，收起时不会跳动。
-    // 进入时状态栏可能正被视频页隐藏，至少留出搜索栏那一行的高度
-    _mainController.homeTopHeight = homeTop
-        ? max(
-            Style.topBarHeight,
-            changed
-                ? _padding.top
-                : max(_mainController.homeTopHeight, _padding.top),
-          )
-        : 0;
-    _mainController.topBarExtent = homeTop
-        ? _mainController.homeTopHeight
-        : Style.topBarHeight;
+    // 首页监听它，开合、旋转时即使首页自己没有重建也会切换顶栏
+    _mainController
+      ..homeTopBar.value = next
+      ..topBarExtent = next?.height ?? Style.topBarHeight;
     if (changed) {
       // 换了布局，顶栏和底栏重新显示。不能在构建过程中改
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -260,6 +255,11 @@ class _MainAppState extends PopScopeState<MainApp>
         _syncHomeStatusBar(force: true);
       });
     }
+  }
+
+  /// 系统给的顶栏位置晚于布局到达（要等原生层布局完成）
+  void _onTopBarRegion() {
+    if (mounted) setState(_updateNavMode);
   }
 
   // 系统标签栏的隐藏和恢复由 IOSNativeTabBar.navigationObserver 负责：这里只能
@@ -310,6 +310,7 @@ class _MainAppState extends PopScopeState<MainApp>
     for (final worker in _homeTopWorkers) {
       worker.dispose();
     }
+    IOSNativeTabBar.topBarRegion.removeListener(_onTopBarRegion);
     _accountsListener?.cancel();
     if (IOSNativeTabBar.onToolAction == _onTool) {
       IOSNativeTabBar.onToolAction = null;
@@ -552,19 +553,23 @@ class _MainAppState extends PopScopeState<MainApp>
         : .horizontal;
     // 延伸到竖状态栏下面（iPhone Duo），否则这一层会按让出竖状态栏后的宽度
     // 裁切，页面里左右滑动的内容画不到竖状态栏下面，见 [RailPageViewport]
-    // 顶部安全区由每个页面自己让开：iPhone Duo 展开竖屏时首页要画进状态栏
-    // 那一行（见 [_updateHomeTop]）。各种布局下结构都一样，旋转或展开时页面
+    // 顶部安全区由每个页面自己让开：iPhone Duo 展开竖屏时首页、动态、我的
+    // 把顶部那一行画进状态栏那一行（见 [_updateHomeTop]、
+    // [MainController.homeTopBar]）。各种布局下结构都一样，旋转或展开时页面
     // 状态不会丢
     final pages = _mainController.navigationBars
         .map(
           (i) => RailPagePadding(
             child: Padding(
               padding: .only(
-                top: i == .home && _mainController.homeTopInStatusBar
+                top:
+                    _mainController.homeTopInStatusBar &&
+                        (i == .home || i == .dynamics || i == .mine)
                     ? 0.0
                     : _padding.top,
               ),
-              child: i.page,
+              // 页面顶边以上不显示：往上收起的首页顶栏不能画进状态栏和灵动岛
+              child: ClipRect(clipper: const _ClipAbove(), child: i.page),
             ),
           ),
         )
@@ -698,4 +703,19 @@ class _MainAppState extends PopScopeState<MainApp>
       ],
     );
   }
+}
+
+/// 只裁掉页面顶边以上的部分。页面在里面让开顶部安全区，原来外层的页面容器从
+/// 状态栏下面开始，会裁掉往上收起的顶栏；现在容器从屏幕顶边开始（iPhone Duo
+/// 展开竖屏时首页要画进状态栏那一行），由这里补上。左右不裁，页面里左右滑动的
+/// 内容要能延伸到竖状态栏下面
+class _ClipAbove extends CustomClipper<Rect> {
+  const _ClipAbove();
+
+  @override
+  Rect getClip(Size size) =>
+      Rect.fromLTRB(-size.width, 0, size.width * 2, size.height * 2);
+
+  @override
+  bool shouldReclip(_ClipAbove oldClipper) => false;
 }

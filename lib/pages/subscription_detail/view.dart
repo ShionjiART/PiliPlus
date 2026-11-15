@@ -9,6 +9,7 @@ import 'package:PiliPlus/pages/common/page_order/page_order_btn_mixin.dart';
 import 'package:PiliPlus/pages/subscription_detail/controller.dart';
 import 'package:PiliPlus/pages/subscription_detail/widget/sub_video_card.dart';
 import 'package:PiliPlus/utils/grid.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:PiliPlus/utils/num_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:get/get.dart';
@@ -167,7 +168,10 @@ class _SubDetailPageState extends State<SubDetailPage>
             ),
           ),
           padding: EdgeInsets.only(
-            top: kToolbarHeight + padding.top + 10,
+            top:
+                kToolbarHeight +
+                IOSNativeTabBar.appBarTop(context, safeTop: padding.top) +
+                10,
             left: 12 + padding.left,
             right: 12,
             bottom: 12,

@@ -110,14 +110,16 @@ final class NativeTabBarController: UITabBarController, UITabBarControllerDelega
   private func makeHost() -> FlutterHostViewController {
     let host = FlutterHostViewController()
     host.onSafeAreaChange = { [weak self, weak host] insets in
-      guard let self else { return }
+      // A host outside the window (a tab that is not shown yet, when embed()
+      // moves Flutter into it) reports all zeros, and Dart would lay out one
+      // frame without the safe area. The real insets follow once the host is
+      // in the window (viewIsAppearing / viewSafeAreaInsetsDidChange).
+      guard let self, let window = host?.view.window else { return }
       var insets = insets
       // iPhone Duo: UIKit moves the navigation bar into the vertical bar but
       // still adds its height to the top safe area. Nothing is drawn there, so
       // keep the window's own top inset and the page does not move down.
-      if let window = host?.view.window {
-        insets.top = min(insets.top, window.safeAreaInsets.top)
-      }
+      insets.top = min(insets.top, window.safeAreaInsets.top)
       // iPhone Duo: while the status bar sits in the vertical bar on the side,
       // nothing is shown at the top edge, but a real device can still report a
       // top inset (about 20pt; the simulator reports 0), which left an empty
@@ -130,7 +132,53 @@ final class NativeTabBarController: UITabBarController, UITabBarControllerDelega
       self.safeArea = insets
       self.channel?.invokeMethod("safeArea", arguments: Self.encode(insets))
     }
+    host.onLayout = { [weak self, weak host] in
+      guard let self, let view = host?.view else { return }
+      self.updateTopBarRegion(view)
+    }
     return host
+  }
+
+  // iPhone Duo unfolded in portrait: the status bar sits only in the top-right
+  // corner, and the system reserves just that corner. The home page puts its
+  // own row of buttons in the rest of the status bar row, at the place UIKit
+  // gives for a top bar, so nothing is hard-coded to a particular device.
+  private static let topBarExtent: CGFloat = 44
+  private var topBarRegion: [String: Double]?
+
+  private func updateTopBarRegion(_ view: UIView) {
+    #if compiler(>=6.4)
+      if #available(iOS 27.1, *) {
+        guard let window = view.window else { return }
+        // Pages hide the status bar (the video page, the home page while its
+        // top bar is scrolled away); then the corner is not reserved. Keep the
+        // values from when it was shown so the layout does not jump.
+        if window.windowScene?.statusBarManager?.isStatusBarHidden ?? false { return }
+        var region: [String: Double]?
+        let width = view.bounds.width
+        let topCorner = view.reservedRegions(kind: .occlusion).contains {
+          $0.frame.minY <= 0 && $0.frame.height > 0 && $0.frame.width < width / 2
+        }
+        if traitCollection.verticalBarEdge == .unspecified && topCorner {
+          let bar = view.edgeInsets(for: .bar(onEdge: UIRectEdge.top, extent: Self.topBarExtent))
+          // UIKit centers a top bar in the status bar row but keeps it at
+          // least some distance from the top edge; a tall bar shows that
+          // distance. Dart places bars of other heights (an app bar is 56)
+          // the same way.
+          let tall = view.edgeInsets(for: .bar(onEdge: UIRectEdge.top, extent: 64))
+          region = [
+            "height": min(view.safeAreaInsets.top, window.safeAreaInsets.top),
+            "top": bar.top, "left": bar.left, "right": bar.right,
+            "extent": Self.topBarExtent,
+            "center": bar.top + Self.topBarExtent / 2,
+            "minTop": tall.top,
+          ]
+        }
+        guard region != topBarRegion else { return }
+        topBarRegion = region
+        channel?.invokeMethod("topBarRegion", arguments: region)
+      }
+    #endif
   }
 
   private static func encode(_ insets: UIEdgeInsets) -> [String: Double] {
@@ -156,6 +204,8 @@ final class NativeTabBarController: UITabBarController, UITabBarControllerDelega
       result(nil)
     case "getSafeArea":
       result(Self.encode(safeArea))
+    case "getTopBarRegion":
+      result(topBarRegion)
     case "getBackAvailable":
       result(navigationHost?.backAvailable ?? false)
     case "setTabs":
@@ -542,8 +592,18 @@ final class NativePageNavigationController: UINavigationController {
     avatarURL = url
     if item.image == nil, let placeholder { item.image = UIImage(systemName: placeholder) }
     guard let source = URL(string: url) else { return }
-    avatarTask = URLSession.shared.dataTask(with: source) { [weak self, weak item] data, _, _ in
-      guard let data, let image = UIImage(data: data) else { return }
+    avatarTask = URLSession.shared.dataTask(with: source) { [weak self, weak item] data, _, error in
+      guard let data, let image = UIImage(data: data) else {
+        // Cancelled: a newer request took over and cleared avatarURL itself.
+        if (error as? URLError)?.code == .cancelled { return }
+        // Forget the address so the next setTools tries it again; otherwise
+        // the placeholder stays until the address changes.
+        DispatchQueue.main.async {
+          guard let self, self.avatarURL == url else { return }
+          self.avatarURL = nil
+        }
+        return
+      }
       // Nearly fills the round glass button (about 48pt), leaving a thin ring,
       // so the photo reads as large as the search and notification icons.
       let size = CGSize(width: Self.avatarSide, height: Self.avatarSide)
@@ -826,8 +886,25 @@ final class FlutterHostViewController: UIViewController {
   /// controller, so the tab bar controller forwards this one to Dart.
   var onSafeAreaChange: ((UIEdgeInsets) -> Void)?
 
+  /// Reserved regions are only known after layout.
+  var onLayout: (() -> Void)?
+
+  override func viewDidLayoutSubviews() {
+    super.viewDidLayoutSubviews()
+    if !children.isEmpty { onLayout?() }
+  }
+
   override func viewSafeAreaInsetsDidChange() {
     super.viewSafeAreaInsetsDidChange()
+    if !children.isEmpty { onSafeAreaChange?(view.safeAreaInsets) }
+  }
+
+  /// In the window with up-to-date insets, before the tab is first drawn.
+  /// embed() skips its report while the host is outside the window, and the
+  /// insets need not change on the way in, so report them here as well; the
+  /// tab bar controller drops values it has already sent.
+  override func viewIsAppearing(_ animated: Bool) {
+    super.viewIsAppearing(animated)
     if !children.isEmpty { onSafeAreaChange?(view.safeAreaInsets) }
   }
 }

@@ -84,9 +84,12 @@ class _HomePageState extends CommonPageState<HomePage>
             valueListenable: IOSNativeTabBar.toolsShown,
             builder: (context, toolsShown, child) =>
                 toolsShown ? const SizedBox.shrink() : child!,
-            child: _mainController.homeTopInStatusBar
-                ? statusBarAppBar()
-                : customAppBar(),
+            // 开合、旋转时首页自己不一定重建，跟着主页面给的位置切换
+            child: ValueListenableBuilder(
+              valueListenable: _mainController.homeTopBar,
+              builder: (context, region, _) =>
+                  region != null ? statusBarAppBar(region) : customAppBar(),
+            ),
           ),
         tabBar,
         Expanded(
@@ -152,25 +155,31 @@ class _HomePageState extends CommonPageState<HomePage>
     );
   }
 
-  /// iPhone Duo 展开竖屏：状态栏在顶部右侧，左边空着。头像、搜索和消息放进
-  /// 状态栏这一行，右边让开状态栏；上滑时这一行连同状态栏一起收起，标签栏
-  /// 移到最上面，和 B 站官方客户端一样
-  Widget statusBarAppBar() {
-    final height = _mainController.homeTopHeight;
+  /// iPhone Duo 展开竖屏：状态栏只占右上角，左边空着。头像、搜索和消息放进
+  /// 状态栏这一行，位置和右边让开的距离都用系统给的 [region]；上滑时这一行
+  /// 连同状态栏一起收起，标签栏移到最上面，和 B 站官方客户端一样
+  Widget statusBarAppBar(TopBarRegion region) {
+    final height = region.height;
     final child = SizedBox(
       height: height,
       child: Padding(
-        padding: const EdgeInsets.only(left: 14, right: _statusBarWidth),
-        child: Row(
-          children: [
-            userAvatar(
-              colorScheme: _colorScheme,
-              mainController: _mainController,
+        padding: region.padding,
+        child: Align(
+          alignment: .topCenter,
+          child: SizedBox(
+            height: region.extent,
+            child: Row(
+              children: [
+                userAvatar(
+                  colorScheme: _colorScheme,
+                  mainController: _mainController,
+                ),
+                const SizedBox(width: 10),
+                searchBar(height: region.extent),
+                msgBadge(_mainController),
+              ],
             ),
-            const SizedBox(width: 10),
-            searchBar(),
-            msgBadge(_mainController),
-          ],
+          ),
         ),
       ),
     );
@@ -209,14 +218,11 @@ class _HomePageState extends CommonPageState<HomePage>
     return child;
   }
 
-  /// 顶部右侧状态栏（时间、信号、电量）的宽度
-  static const _statusBarWidth = 148.0;
-
-  Widget searchBar() {
+  Widget searchBar({double height = 44}) {
     const borderRadius = BorderRadius.all(Radius.circular(25));
     return Expanded(
       child: SizedBox(
-        height: 44,
+        height: height,
         child: Material(
           borderRadius: borderRadius,
           color: _colorScheme.onSecondaryContainer.withValues(alpha: 0.05),

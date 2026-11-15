@@ -10,6 +10,7 @@ import 'package:PiliPlus/utils/ios/native_navigation_observer.dart';
 import 'package:PiliPlus/utils/ios/native_page_actions.dart';
 import 'package:PiliPlus/utils/ios/native_tab_tools.dart';
 import 'package:PiliPlus/utils/ios/vertical_bar_owner.dart';
+import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
@@ -37,6 +38,12 @@ abstract final class IOSNativeTabBar {
   /// 由原生层转发；为 null 时使用 Flutter 自己的值
   static final safeArea = ValueNotifier<EdgeInsets?>(null);
 
+  /// iPhone Duo 展开竖屏时状态栏只占顶部右上角，这一行其余的地方可以放
+  /// 页面自己的顶栏（首页的头像、搜索和消息）。位置是系统给的：
+  /// `UIView.edgeInsets(for: .bar(onEdge: .top, extent:))`，右边让开系统
+  /// 保留的状态栏区域。其他时候为 null
+  static final topBarRegion = ValueNotifier<TopBarRegion?>(null);
+
   /// 侧边安全区达到这个宽度（原生 pt）时就是竖状态栏，和 SceneDelegate 的
   /// 判断一致；普通 iPhone 横屏时灵动岛那一侧最多约 62pt
   static const double verticalBarMinInset = 72;
@@ -49,6 +56,8 @@ abstract final class IOSNativeTabBar {
           _onSelect?.call(call.arguments as int);
         case 'safeArea':
           _setSafeArea(call.arguments);
+        case 'topBarRegion':
+          topBarRegion.value = TopBarRegion.fromMap(call.arguments);
         case 'verticalBarHidden':
           verticalBarHidden.value = call.arguments as bool;
         case 'back':
@@ -73,6 +82,9 @@ abstract final class IOSNativeTabBar {
     });
     try {
       _setSafeArea(await _channel.invokeMethod('getSafeArea'));
+      topBarRegion.value = TopBarRegion.fromMap(
+        await _channel.invokeMethod('getTopBarRegion'),
+      );
       // 原生层在 Flutter 准备好之前可能已经发过通知
       backAvailable.value =
           await _channel.invokeMethod<bool>('getBackAvailable') ?? false;
@@ -267,6 +279,44 @@ abstract final class IOSNativeTabBar {
   /// 的页面在进出视频页时跟着变布局；视频页用的是自己的返回键
   static final backAvailable = ValueNotifier(false);
 
+  /// iPhone Duo 展开竖屏：页面的标题栏放进状态栏那一行，和系统的导航栏一样
+  /// （见 `lib/scripts/material/app_bar_status_bar_row.patch`）。位置用系统给
+  /// 的 [topBarRegion]：标题栏在这一行里垂直居中，左边避开圆角，右边让开
+  /// 状态栏。只用于贴着屏幕顶边、顶部安全区还没被用掉的标题栏；其他姿态和
+  /// 普通 iPhone 返回 null，标题栏照常放在顶部安全区下面
+  static EdgeInsets? statusBarRowPadding(
+    BuildContext context,
+    double toolbarHeight,
+  ) {
+    final region = context
+        .dependOnInheritedWidgetOfExactType<TopBarRegionScope>()
+        ?.notifier
+        ?.value;
+    if (region == null) return null;
+    final size = MediaQuery.sizeOf(context);
+    if (size.height <= size.width || size.shortestSide < 600) return null;
+    // 顶部安全区已被外层用掉（不在屏幕顶边），或状态栏已隐藏
+    if (MediaQuery.paddingOf(context).top < region.height - 0.5) return null;
+    return EdgeInsets.only(
+      top: region.topFor(toolbarHeight),
+      left: region.padding.left,
+      right: region.padding.right,
+    );
+  }
+
+  /// 主标题栏（高 [toolbarHeight]）离屏幕顶边的距离：展开竖屏时它放在状态栏
+  /// 那一行里（见 [statusBarRowPadding]），其他时候在顶部安全区 [safeTop]
+  /// 下面。自己按「顶部安全区 + 标题栏高度」排版的页面（可折叠头部的高度、
+  /// 头部背景里内容的位置）用它代替顶部安全区，和标题栏对齐
+  static double appBarTop(
+    BuildContext context, {
+    double toolbarHeight = 56,
+    double? safeTop,
+  }) =>
+      statusBarRowPadding(context, toolbarHeight)?.top ??
+      safeTop ??
+      MediaQuery.paddingOf(context).top;
+
   /// [context] 所在页面左上角的返回键是否由竖状态栏里的返回键代替。弹窗等
   /// 不是页面的路由不算，竖状态栏的返回键不对应它们。
   ///
@@ -377,4 +427,74 @@ class NativeSafeArea extends StatelessWidget {
 class NativeBackScope extends InheritedNotifier<ValueNotifier<bool>> {
   NativeBackScope({super.key, required super.child})
     : super(notifier: IOSNativeTabBar.backAvailable);
+}
+
+/// 让依赖 [IOSNativeTabBar.topBarRegion] 的组件（标题栏）在它变化时重建。
+/// 系统给的位置要等原生层布局完成才到，可能晚于开合、旋转后的第一次构建
+class TopBarRegionScope
+    extends InheritedNotifier<ValueNotifier<TopBarRegion?>> {
+  TopBarRegionScope({super.key, required super.child})
+    : super(notifier: IOSNativeTabBar.topBarRegion);
+}
+
+/// 状态栏那一行里能放顶栏的位置，见 [IOSNativeTabBar.topBarRegion]
+@immutable
+class TopBarRegion {
+  const TopBarRegion({
+    required this.height,
+    required this.padding,
+    required this.extent,
+    required this.center,
+    required this.minTop,
+  });
+
+  /// 状态栏那一行的高度（状态栏显示时的顶部安全区）
+  final double height;
+
+  /// 顶栏在这一行里的位置：上边距，以及左右避开圆角和状态栏的距离
+  final EdgeInsets padding;
+
+  /// 顶栏的高度
+  final double extent;
+
+  /// 系统让顶栏在这一行里垂直居中的中线位置（距屏幕顶边）
+  final double center;
+
+  /// 顶栏离屏幕顶边的最小距离
+  final double minTop;
+
+  /// 高度为 [barHeight] 的顶栏离屏幕顶边的距离，和系统放顶栏的方式一致：
+  /// 以 [center] 居中，但不小于 [minTop]
+  double topFor(double barHeight) => max(minTop, center - barHeight / 2);
+
+  /// 原生层的值是原生 pt，按界面缩放换算成 Flutter 的逻辑像素，和
+  /// [NativeSafeArea] 一样
+  static TopBarRegion? fromMap(Object? value) {
+    if (value is! Map) return null;
+    final scale = Pref.uiScale;
+    double get(String key) => ((value[key] as num?)?.toDouble() ?? 0) / scale;
+    return TopBarRegion(
+      height: get('height'),
+      padding: EdgeInsets.only(
+        top: get('top'),
+        left: get('left'),
+        right: get('right'),
+      ),
+      extent: get('extent'),
+      center: get('center'),
+      minTop: get('minTop'),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is TopBarRegion &&
+      other.height == height &&
+      other.padding == padding &&
+      other.extent == extent &&
+      other.center == center &&
+      other.minTop == minTop;
+
+  @override
+  int get hashCode => Object.hash(height, padding, extent, center, minTop);
 }

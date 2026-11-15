@@ -7,6 +7,7 @@ import 'package:PiliPlus/common/widgets/flutter/refresh_indicator.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/image_viewer/hero.dart';
 import 'package:PiliPlus/common/widgets/marquee.dart';
+import 'package:PiliPlus/common/widgets/scaffold/floating_app_bar_scaffold.dart';
 import 'package:PiliPlus/common/widgets/scaffold/mini_scaffold.dart';
 import 'package:PiliPlus/common/widgets/scaffold/simple_scaffold.dart';
 import 'package:PiliPlus/common/widgets/selection_text.dart';
@@ -66,45 +67,21 @@ class _MusicDetailPageState extends CommonDynPageState<MusicDetailPage> {
     // 一条；评论栏吸顶时停在顶栏下面（见 [_buildBody]）
     _floatingAppBar =
         isPortrait && IOSNativeTabBar.hidesPageBackButton(context);
-    Widget body = Padding(
-      padding: EdgeInsets.only(left: padding.left, right: padding.right),
-      child: isPortrait
-          ? refreshIndicator(
-              onRefresh: controller.onRefresh,
-              child: _buildBody(),
-            )
-          : _buildBody(),
-    );
-    if (_floatingAppBar) {
-      body = Stack(
-        children: [
-          Padding(
-            padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top),
-            child: body,
-          ),
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: Obx(() {
-              final showTitle = controller.showTitle.value;
-              return IgnorePointer(
-                ignoring: !showTitle,
-                child: AnimatedOpacity(
-                  opacity: showTitle ? 1 : 0,
-                  duration: const Duration(milliseconds: 300),
-                  child: _buildAppBar(),
-                ),
-              );
-            }),
-          ),
-        ],
-      );
-    }
     return fabAnimWrapper(
-      child: SimpleScaffold(
-        appBar: _floatingAppBar ? null : _buildAppBar(),
-        body: body,
+      // 开合时 [_floatingAppBar] 会变，树的结构保持不变，滚动位置不丢
+      child: FloatingAppBarScaffold(
+        floating: _floatingAppBar,
+        showFloatingAppBar: controller.showTitle,
+        appBarBuilder: _buildAppBar,
+        body: Padding(
+          padding: EdgeInsets.only(left: padding.left, right: padding.right),
+          child: isPortrait
+              ? refreshIndicator(
+                  onRefresh: controller.onRefresh,
+                  child: _buildBody(),
+                )
+              : _buildBody(),
+        ),
       ),
     );
   }
@@ -167,8 +144,8 @@ class _MusicDetailPageState extends CommonDynPageState<MusicDetailPage> {
                 SliverToBoxAdapter(
                   child: _buildChart(response, maxWidth),
                 ),
-                if (_floatingAppBar)
-                  const SliverPinnedGap(extent: kToolbarHeight),
+                // 一直保留，不浮动时高度为 0，免得开合时列表的结构变化
+                SliverPinnedGap(extent: _floatingAppBar ? kToolbarHeight : 0),
                 buildReplyHeader(),
                 Obx(() => replyList(controller.loadingState.value)),
               ],

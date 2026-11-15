@@ -13,6 +13,10 @@ struct DashTrack {
 enum SystemPlayerHLSError: Error {
   case badResponse(Int)
   case noSidx
+  /// The data ends inside a box (e.g. a cut-off response from the CDN).
+  case truncated
+  /// A box holds values that cannot be right, e.g. a `sidx` timescale of 0.
+  case malformed
 }
 
 /// Turns bilibili DASH files into fMP4 HLS playlists.
@@ -58,55 +62,76 @@ enum SystemPlayerHLS {
     return try parse([UInt8](data))
   }
 
+  /// Every read is checked against `limit` (the end of the box being read, or
+  /// of the data): indexing past the end of a Swift array would crash the app
+  /// instead of letting the Dart side fall back to mpv.
   static func parse(_ b: [UInt8]) throws -> Media {
-    func u32(_ i: Int) -> Int {
-      Int(b[i]) << 24 | Int(b[i + 1]) << 16 | Int(b[i + 2]) << 8 | Int(b[i + 3])
+    func u32(_ i: Int, _ limit: Int) throws -> Int {
+      guard i >= 0, i <= limit - 4 else { throw SystemPlayerHLSError.truncated }
+      return Int(b[i]) << 24 | Int(b[i + 1]) << 16 | Int(b[i + 2]) << 8 | Int(b[i + 3])
     }
-    func u64(_ i: Int) -> Int { u32(i) << 32 | u32(i + 4) }
+    func u64(_ i: Int, _ limit: Int) throws -> Int {
+      try u32(i, limit) << 32 | u32(i + 4, limit)
+    }
+    func add(_ x: Int, _ y: Int) throws -> Int {
+      let (sum, overflow) = x.addingReportingOverflow(y)
+      if overflow { throw SystemPlayerHLSError.malformed }
+      return sum
+    }
     var i = 0
     var initEnd = 0
     var info = TrackInfo()
     while i + 8 <= b.count {
-      var size = u32(i)
+      var size = try u32(i, b.count)
       let type = String(bytes: b[(i + 4)..<(i + 8)], encoding: .ascii) ?? ""
-      if size == 1 { size = u64(i + 8) }
+      if size == 1 { size = try u64(i + 8, b.count) }
       if size < 8 { break }
-      if type == "ftyp" || type == "moov" { initEnd = i + size }
-      if type == "moov", i + size <= b.count { info = trackInfo(b, i + 8, i + size) }
+      let boxEnd = try add(i, size)
+      if type == "ftyp" || type == "moov" { initEnd = boxEnd }
+      if type == "moov", boxEnd <= b.count { info = try trackInfo(b, i + 8, boxEnd) }
       if type == "sidx" {
+        // Fields past the box belong to the next box, and past the data do
+        // not exist.
+        let end = min(boxEnd, b.count)
+        guard i + 9 <= end else { throw SystemPlayerHLSError.truncated }
         let version = b[i + 8]
         var off = i + 12
-        let timescale = Double(u32(off + 4))
+        let timescale = try u32(off + 4, end)
+        guard timescale > 0 else { throw SystemPlayerHLSError.malformed }
         off += 8
         let firstOffset: Int
         if version == 0 {
-          firstOffset = u32(off + 4)
+          firstOffset = try u32(off + 4, end)
           off += 8
         } else {
-          firstOffset = u64(off + 8)
+          firstOffset = try u64(off + 8, end)
           off += 16
         }
+        guard firstOffset >= 0 else { throw SystemPlayerHLSError.malformed }
+        guard off + 4 <= end else { throw SystemPlayerHLSError.truncated }
         let count = Int(b[off + 2]) << 8 | Int(b[off + 3])
         off += 4
-        var pos = i + size + firstOffset
+        var pos = try add(boxEnd, firstOffset)
         var segments: [(Int, Int, Double)] = []
         for _ in 0..<count {
-          let length = u32(off) & 0x7fff_ffff
-          let duration = Double(u32(off + 4)) / timescale
+          let length = try u32(off, end) & 0x7fff_ffff
+          let duration = Double(try u32(off + 4, end)) / Double(timescale)
           segments.append((pos, length, duration))
-          pos += length
+          pos = try add(pos, length)
           off += 12
         }
         return Media(initLength: initEnd, segments: segments, info: info)
       }
-      i += size
+      i = boxEnd
     }
     throw SystemPlayerHLSError.noSidx
   }
 
   // MARK: - Init section parsing (codec strings for the master playlist)
 
-  private static func trackInfo(_ b: [UInt8], _ start: Int, _ end: Int) -> TrackInfo {
+  /// `end` must not exceed `b.count`. Reads are checked against the end of
+  /// the box they belong to; a box too short for its fields throws.
+  private static func trackInfo(_ b: [UInt8], _ start: Int, _ end: Int) throws -> TrackInfo {
     var info = TrackInfo()
     var colrRange: String?
     var dolbyRange: String?
@@ -114,27 +139,34 @@ enum SystemPlayerHLS {
     func u32(_ i: Int) -> Int { u16(i) << 16 | u16(i + 2) }
     func hex(_ v: Int) -> String { String(v, radix: 16, uppercase: true) }
 
-    func walk(_ from: Int, _ to: Int) {
+    func walk(_ from: Int, _ to: Int) throws {
       var i = from
       while i + 8 <= to {
         let size = u32(i)
         guard size >= 8, i + size <= to else { return }
         let type = String(bytes: b[(i + 4)..<(i + 8)], encoding: .ascii) ?? ""
         let body = i + 8
+        let boxEnd = i + size
+        /// Throws unless `count` bytes from `p` lie inside this box.
+        func need(_ p: Int, _ count: Int) throws {
+          guard p >= body, p <= boxEnd - count else { throw SystemPlayerHLSError.truncated }
+        }
         switch type {
         case "moov", "trak", "mdia", "minf", "stbl":
-          walk(body, i + size)
+          try walk(body, boxEnd)
         case "stsd":
-          walk(body + 8, i + size)  // version/flags + entry_count
+          try walk(body + 8, boxEnd)  // version/flags + entry_count
         case "hvc1", "hev1", "dvh1", "dvhe", "avc1", "avc3", "av01":
+          try need(body + 24, 4)
           info.width = u16(body + 24)
           info.height = u16(body + 26)
           info.codecs = type  // refined by the config boxes below
-          walk(body + 78, i + size)
+          try walk(body + 78, boxEnd)
         case "mp4a", "ec-3", "ac-3", "fLaC", "Opus":
           info.codecs = type == "mp4a" ? "mp4a.40.2" : type
-          walk(body + 28, i + size)
+          try walk(body + 28, boxEnd)
         case "hvcC":
+          try need(body, 13)  // configurationVersion ... general_level_idc
           let p = body + 1
           let space = ["", "A", "B", "C"][Int(b[p]) >> 6]
           let tier = (b[p] >> 5) & 1 == 1 ? "H" : "L"
@@ -153,16 +185,19 @@ enum SystemPlayerHLS {
           for c in constraints { s += "." + hex(c) }
           // A dvh1/dvhe entry (profile 5) keeps its Dolby Vision string.
           if info.codecs?.hasPrefix("dv") != true { info.codecs = s }
-          info.spsTransfer = SystemPlayerHEVC.transfer(hvcC: b, body: body, end: i + size)
+          info.spsTransfer = SystemPlayerHEVC.transfer(hvcC: b, body: body, end: boxEnd)
         case "avcC":
+          try need(body, 4)
           info.codecs = String(format: "avc1.%02X%02X%02X", b[body + 1], b[body + 2], b[body + 3])
         case "av1C":
+          try need(body, 3)
           let profile = Int(b[body + 1]) >> 5
           let level = Int(b[body + 1]) & 0x1f
           let tier = (b[body + 2] >> 7) & 1 == 1 ? "H" : "M"
           let depth = (b[body + 2] >> 5) & 1 == 1 ? 12 : ((b[body + 2] >> 6) & 1 == 1 ? 10 : 8)
           info.codecs = String(format: "av01.%d.%02d%@.%02d", profile, level, tier, depth)
         case "dvcC", "dvvC", "dvwC":
+          try need(body, 5)
           let profile = Int(b[body + 2]) >> 1
           let level = (Int(b[body + 2]) & 1) << 5 | Int(b[body + 3]) >> 3
           let compat = Int(b[body + 4]) >> 4
@@ -179,31 +214,42 @@ enum SystemPlayerHLS {
             dolbyRange = [1: "PQ", 2: "SDR", 4: "HLG", 6: "PQ"][compat]
           }
         case "colr":
+          try need(body, 4)
           if String(bytes: b[body..<(body + 4)], encoding: .ascii) == "nclx" {
+            try need(body + 6, 2)
             colrRange = range(transfer: u16(body + 6))
           }
         case "esds":
           // ES_Descriptor > DecoderConfigDescriptor > DecoderSpecificInfo
           var p = body + 4
           func descriptor(_ tag: UInt8) -> Bool {
-            guard p < i + size, b[p] == tag else { return false }
+            guard p >= body, p < boxEnd, b[p] == tag else { return false }
             p += 1
-            while p < i + size, b[p] & 0x80 != 0 { p += 1 }
+            while p < boxEnd, b[p] & 0x80 != 0 { p += 1 }
             p += 1
             return true
           }
           if descriptor(0x03) {
+            try need(p, 3)  // ES_ID, flags
             let flags = b[p + 2]
             p += 3
             if flags & 0x80 != 0 { p += 2 }
-            if flags & 0x40 != 0 { p += 1 + Int(b[p]) }
+            if flags & 0x40 != 0 {
+              try need(p, 1)  // URL length
+              p += 1 + Int(b[p])
+            }
             if flags & 0x20 != 0 { p += 2 }
             if descriptor(0x04) {
+              try need(p, 1)  // objectTypeIndication
               let object = b[p]
               p += 13
               if object == 0x40, descriptor(0x05) {
+                try need(p, 1)
                 var aot = Int(b[p]) >> 3
-                if aot == 31 { aot = 32 + ((Int(b[p]) & 7) << 3 | Int(b[p + 1]) >> 5) }
+                if aot == 31 {
+                  try need(p, 2)
+                  aot = 32 + ((Int(b[p]) & 7) << 3 | Int(b[p + 1]) >> 5)
+                }
                 info.codecs = "mp4a.40.\(aot)"
               } else if object == 0x6b || object == 0x69 {
                 info.codecs = "mp4a.6B"
@@ -216,7 +262,7 @@ enum SystemPlayerHLS {
         i += size
       }
     }
-    walk(start, end)
+    try walk(start, end)
     if info.width > 0 {
       // AVPlayer checks VIDEO-RANGE against the bitstream, so the SPS wins;
       // bilibili's DV and some HDR streams have no `colr` box.
@@ -358,7 +404,9 @@ extension SystemPlayerHLS {
       let size = Int(b[i]) << 24 | Int(b[i + 1]) << 16 | Int(b[i + 2]) << 8 | Int(b[i + 3])
       guard size >= 8, i + size <= b.count else { break }
       if String(bytes: b[(i + 4)..<(i + 8)], encoding: .ascii) == "moov" {
-        return trackInfo(b, i + 8, i + size)
+        // A broken moov gives no info; AVPlayer then fails on its own and
+        // mpv takes over, instead of the app crashing here.
+        return (try? trackInfo(b, i + 8, i + size)) ?? TrackInfo()
       }
       i += size
     }

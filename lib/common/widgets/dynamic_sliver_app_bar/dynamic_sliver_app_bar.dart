@@ -22,6 +22,7 @@ import 'package:PiliPlus/common/widgets/dynamic_sliver_app_bar/rendering/sliver_
 import 'package:PiliPlus/common/widgets/dynamic_sliver_app_bar/sliver_persistent_header.dart';
 import 'package:PiliPlus/common/widgets/only_layout_widget.dart'
     show LayoutCallback;
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart' show RenderOpacity, OpacityLayer;
 import 'package:flutter/services.dart';
@@ -300,8 +301,12 @@ class DynamicSliverAppBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final double bottomHeight = bottom?.preferredSize.height ?? 0.0;
+    // 展开竖屏时标题栏在状态栏那一行里（iPhone Duo），折叠后的高度跟着它
     final double topPadding = primary
-        ? MediaQuery.viewPaddingOf(context).top
+        ? IOSNativeTabBar.appBarTop(
+            context,
+            safeTop: MediaQuery.viewPaddingOf(context).top,
+          )
         : 0.0;
     final double effectiveCollapsedHeight =
         topPadding + kToolbarHeight + bottomHeight + 1;

@@ -35,12 +35,15 @@
 - [x] 视频页的底部弹窗（长按评论的菜单、分享、收藏、缓存、转发、播放器设置等）和页面一样铺满竖状态栏的位置，右边不再留出一条（[#25](https://github.com/ShionjiART/PiliPlus/pull/25)）
 - [x] 动态详情页的点赞、评论、分享、转发放进竖状态栏，带简短的数量（1.2万、1千万、1.2亿）；发评论单独一个按钮放在最下面，代替页面上的悬浮按钮；底部操作栏保留（[#26](https://github.com/ShionjiART/PiliPlus/pull/26)）。后来顺序改为点赞、评论、转发（带数量）、分享（只有图标），按钮变矮，通话时也不会被收进 ⋯ 菜单（[#33](https://github.com/ShionjiART/PiliPlus/pull/33)）
 - [x] Duo 上首页顶部的搜索栏、消息按钮和头像那一行去掉（都已在竖状态栏里），分区标签移到最上面（[#27](https://github.com/ShionjiART/PiliPlus/pull/27)）
-- [x] 展开竖屏时首页的头像、搜索栏和消息按钮放进顶部状态栏那一行（右边让开时间和 Wi-Fi），和 B 站官方客户端一样；往上滑时这一行连同状态栏一起收起，分区标签移到最上面，往下滑再出现（[#52](https://github.com/ShionjiART/PiliPlus/pull/52)）
+- [x] 展开竖屏时首页的头像、搜索栏和消息按钮放进顶部状态栏那一行（右边让开时间和 Wi-Fi），和 B 站官方客户端一样；往上滑时这一行连同状态栏一起收起，分区标签移到最上面，往下滑再出现（[#52](https://github.com/ShionjiART/PiliPlus/pull/52)）。后来这一行的位置和给时间、Wi-Fi 让出的宽度改用系统给的值，并修复合上时启动、展开后首页仍是旧样式（[#58](https://github.com/ShionjiART/PiliPlus/pull/58)）。#52 曾让直板 iPhone 首页上滑时顶栏画进灵动岛，已修复（[#60](https://github.com/ShionjiART/PiliPlus/pull/60)）
+- [x] 展开竖屏时二级页面的标题栏（返回键、标题、按钮）也放进状态栏那一行，右边停在时间左边，和系统设置、App Store 一样；「我的」「动态」顶部那排按钮和分类标签也放进这一行，用户空间、话题、收藏夹等可折叠头部跟着调整（[#59](https://github.com/ShionjiART/PiliPlus/pull/59)）
 - [x] 二级页面只保留竖状态栏里的返回键，页面左上角的去掉，标题和左边留出间距；竖状态栏的头像点了弹出账号切换，未登录时去「我的」页面登录（[#28](https://github.com/ShionjiART/PiliPlus/pull/28)）
 - [x] 合上时首页、「我的」等页面顶部不再多出一段空白：状态栏在竖栏里时，不再给屏幕顶部留位置（[#31](https://github.com/ShionjiART/PiliPlus/pull/31)）
 - [x] 在账号切换里选了匿名后，点竖栏头像仍弹出账号切换，可以切回原账号；一个账号都没有时才去「我的」登录。竖栏头像图片放大，留白收窄（[#32](https://github.com/ShionjiART/PiliPlus/pull/32)）
+- [x] 竖栏头像加载失败后会重新加载，不再一直显示占位图；切换底部标签时页面不再闪一下（[#55](https://github.com/ShionjiART/PiliPlus/pull/55)）
 - [x] 动态详情页顶部不再空出一条：作者直接在最上面，往上滑过作者后顶栏才浮出来，标签栏停在顶栏下面（[#33](https://github.com/ShionjiART/PiliPlus/pull/33)）
 - [x] 音乐详情页顶部也不再空出一条：歌曲卡片直接在最上面，往上滑过后顶栏才浮出来，评论栏停在顶栏下面（[#41](https://github.com/ShionjiART/PiliPlus/pull/41)）
+- [x] 动态详情和音乐页的顶栏在浮动和普通之间切换时，不再重建页面、丢失滚动位置（[#56](https://github.com/ShionjiART/PiliPlus/pull/56)）
 - [x] 合上时视频页暂停后往上滑、播放器收成一条工具栏，右边的 ⋮ 不再被摄像头挡住：按钮和播放器控件一样避开左右安全区（[#40](https://github.com/ShionjiART/PiliPlus/pull/40)）
 - [x] 移植 [Stasert](https://github.com/Stasert) 的竖栏导航等功能：能用的都已移植，其余几项决定不移植，逐项记录见 [#2](https://github.com/ShionjiART/PiliPlus/issues/2)
 
@@ -52,23 +55,28 @@
 - [x] 可选所有视频都用系统播放器（实验性）（[#12](https://github.com/ShionjiART/PiliPlus/pull/12)）
 - [x] 系统播放器支持画中画、截图和字幕（[#13](https://github.com/ShionjiART/PiliPlus/pull/13)）
 - [x] 修复部分 HDR 真彩、杜比视界视频无法用系统播放器播放，或在播放信息里显示成 SDR（[#13](https://github.com/ShionjiART/PiliPlus/pull/13)）
+- [x] 修复 CDN 返回不完整的数据时系统播放器让 App 闪退，现在会改用内置播放器（[#55](https://github.com/ShionjiART/PiliPlus/pull/55)）
 - [x] 离线缓存的 HDR、杜比视界视频也用系统播放器播放（[#36](https://github.com/ShionjiART/PiliPlus/pull/36)）
 - [x] 「所有视频」模式下尽量都用系统播放器（包括普通画质的 HEVC 和离线缓存）；系统播放器加载超时或没有画面时自动切回内置播放器（[#38](https://github.com/ShionjiART/PiliPlus/pull/38)）
 - [x] 修复系统播放器超过 2 倍速时一直显示「加载中」、一卡一卡：使用系统播放器时倍速最高 2 倍，倍速菜单和长按倍速都封顶 2 倍（[#49](https://github.com/ShionjiART/PiliPlus/pull/49)）
+- [x] 修复系统播放器快速切换分集或画质时，悄悄改用内置播放器或一直转圈；系统播放器出错退回内置播放器时，保持原来的播放或暂停状态；切回内置播放器后恢复 2 倍以上的倍速；缓冲卡住时进度不再往前走（[#54](https://github.com/ShionjiART/PiliPlus/pull/54)）
 - [x] 修复打开视频偶尔整块黑屏或有声音没画面（原版也有，见 [bggRGjQaUbCoE/PiliPlus#3246](https://github.com/bggRGjQaUbCoE/PiliPlus/issues/3246)）：被盖住或已关闭的视频页不再抢用播放器，初始化失败时显示封面可点击重试（[#16](https://github.com/ShionjiART/PiliPlus/pull/16)）
 
 ## 离线缓存
 
 - [x] 修复网络不好时缓存「瞬间完成」但视频不完整：下载完核对文件大小，断了自动续传，续传多次仍不完整就标为失败；续传时换了视频流会从头下载（[#15](https://github.com/ShionjiART/PiliPlus/pull/15)）
+- [x] 修复存储空间满等写入出错时，残缺的缓存仍显示「已完成」：现在照常续传，重试几次仍失败就标为失败（[#53](https://github.com/ShionjiART/PiliPlus/pull/53)）
 
 ## 投屏
 
 - [x] 修复 iOS 投屏一直「搜索设备失败」、不弹局域网授权（[#9](https://github.com/ShionjiART/PiliPlus/pull/9)）
 - [x] 支持 AirPlay 投屏，和现有的局域网投屏并存（[#14](https://github.com/ShionjiART/PiliPlus/pull/14)）
+- [x] Android 只开流量时，投屏搜索不再对运营商内网扫描（[#53](https://github.com/ShionjiART/PiliPlus/pull/53)）
 
 ## 关于和更新
 
 - [x] 关于页的源码、提交、问题反馈链接和检查更新改用本仓库：不再提示下载没有 iPhone Duo 适配的原版安装包；刚装上的版本也不会被当成有新版本（[#44](https://github.com/ShionjiART/PiliPlus/pull/44)）
+- [x] iOS 检查更新只打开安装包，不会打开同名的 .sha256 校验文件；没有当前平台的安装包时不提示更新（[#53](https://github.com/ShionjiART/PiliPlus/pull/53)）
 
 ## 已知问题
 

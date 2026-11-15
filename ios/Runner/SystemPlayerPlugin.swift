@@ -188,7 +188,9 @@ final class SystemPlayerSession: NSObject {
             try await SystemPlayerPlaylistLoader.makeAsset(
               video: video, audio: audio, frameRate: frameRate, headers: headers)
         }
-        if Task.isCancelled { return }
+        // Superseded by another load, or the page closed while loading. The
+        // Dart side still waits for this result, so always answer it.
+        if Task.isCancelled { return completion(SystemPlayerSession.cancelled) }
         self.loader = loader
         self.videoInfo = videoInfo
         self.audioInfo = audioInfo
@@ -204,6 +206,13 @@ final class SystemPlayerSession: NSObject {
           await self.player.seek(
             to: CMTime(value: CMTimeValue(startMs), timescale: 1000),
             toleranceBefore: .zero, toleranceAfter: .zero)
+        }
+        // A newer load may have started during the seek; it owns the player now.
+        if Task.isCancelled { return completion(SystemPlayerSession.cancelled) }
+        // The Dart side ignores error events until this load has answered, so
+        // report an item that already failed here.
+        if item.status == .failed {
+          return completion(Self.describe(item.error, item: item))
         }
         completion(nil)
       } catch {

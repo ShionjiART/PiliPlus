@@ -223,9 +223,16 @@ $AppBarNativeBackPatchMaterial = "lib/scripts/material/app_bar_native_back.patch
 # main.dart sets DialogRoute.safeAreaBuilder.
 $DialogSafeAreaPatchMaterial = "lib/scripts/material/dialog_safe_area.patch"
 
+# iPhone Duo: lets primary app bars put their toolbar in the status bar row
+# when the device is unfolded in portrait (the status bar only takes the top
+# trailing corner). Applied on every platform, since main.dart sets
+# AppBar.statusBarRowPadding.
+$AppBarStatusBarRowPatchMaterial = "lib/scripts/material/app_bar_status_bar_row.patch"
+
 $patches_material = @($ModalBarrierPatchMaterial, $NavigationDrawerPatchMaterial, $PopupMenuPatchMaterial,
                     $FABPatchMaterial, $TextFieldPatchMaterial, $ScaffoldPatchMaterial, $RefreshIndicatorPatchMaterial,
-                    $TabsPatchMaterial, $AppBarNativeBackPatchMaterial, $DialogSafeAreaPatchMaterial)
+                    $TabsPatchMaterial, $AppBarNativeBackPatchMaterial, $DialogSafeAreaPatchMaterial,
+                    $AppBarStatusBarRowPatchMaterial)
 
 $PubCacheDir = "~/.pub-cache"
 
