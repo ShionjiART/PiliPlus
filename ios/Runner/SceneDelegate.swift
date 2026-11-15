@@ -110,33 +110,52 @@ final class NativeTabBarController: UITabBarController, UITabBarControllerDelega
   private func makeHost() -> FlutterHostViewController {
     let host = FlutterHostViewController()
     host.onSafeAreaChange = { [weak self, weak host] insets in
-      // A host outside the window (a tab that is not shown yet, when embed()
-      // moves Flutter into it) reports all zeros, and Dart would lay out one
-      // frame without the safe area. The real insets follow once the host is
-      // in the window (viewIsAppearing / viewSafeAreaInsetsDidChange).
-      guard let self, let window = host?.view.window else { return }
-      var insets = insets
-      // iPhone Duo: UIKit moves the navigation bar into the vertical bar but
-      // still adds its height to the top safe area. Nothing is drawn there, so
-      // keep the window's own top inset and the page does not move down.
-      insets.top = min(insets.top, window.safeAreaInsets.top)
-      // iPhone Duo: while the status bar sits in the vertical bar on the side,
-      // nothing is shown at the top edge, but a real device can still report a
-      // top inset (about 20pt; the simulator reports 0), which left an empty
-      // strip above every page. Normal iPhones in landscape have at most about
-      // 62pt on the Dynamic Island side, so 72 only matches the vertical bar.
-      if max(insets.left, insets.right) >= 72 {
-        insets.top = 0
-      }
-      guard insets != self.safeArea else { return }
-      self.safeArea = insets
-      self.channel?.invokeMethod("safeArea", arguments: Self.encode(insets))
+      guard let self, let host else { return }
+      self.safeAreaHost = host
+      self.publishSafeArea(insets, of: host)
     }
     host.onLayout = { [weak self, weak host] in
       guard let self, let view = host?.view else { return }
       self.updateTopBarRegion(view)
     }
     return host
+  }
+
+  /// The host that last reported its safe area, to send it again after the
+  /// home page shows the status bar (see [mainHidesStatusBar]).
+  private weak var safeAreaHost: FlutterHostViewController?
+
+  private func publishSafeArea(_ insets: UIEdgeInsets, of host: FlutterHostViewController) {
+    // A host outside the window (a tab that is not shown yet, when embed()
+    // moves Flutter into it) reports all zeros, and Dart would lay out one
+    // frame without the safe area. The real insets follow once the host is
+    // in the window (viewIsAppearing / viewSafeAreaInsetsDidChange).
+    guard let window = host.view.window else { return }
+    var insets = insets
+    // iPhone Duo: UIKit moves the navigation bar into the vertical bar but
+    // still adds its height to the top safe area. Nothing is drawn there, so
+    // keep the window's own top inset and the page does not move down.
+    insets.top = min(insets.top, window.safeAreaInsets.top)
+    // iPhone Duo: while the status bar sits in the vertical bar on the side,
+    // nothing is shown at the top edge, but a real device can still report a
+    // top inset (about 20pt; the simulator reports 0), which left an empty
+    // strip above every page. Normal iPhones in landscape have at most about
+    // 62pt on the Dynamic Island side, so 72 only matches the vertical bar.
+    if max(insets.left, insets.right) >= 72 {
+      insets.top = 0
+    }
+    // iPhone Duo unfolded in portrait: the home page hides the status bar
+    // while its top bar is scrolled away, and draws its own row where the
+    // status bar was. The top inset dropping to 0 in the middle of the drag
+    // would make Flutter lay out the whole app again and the bar stutter,
+    // so keep the inset from before; it is sent again once the status bar
+    // is shown (see mainHidesStatusBar).
+    if mainHidesStatusBar {
+      insets.top = safeArea.top
+    }
+    guard insets != self.safeArea else { return }
+    self.safeArea = insets
+    self.channel?.invokeMethod("safeArea", arguments: Self.encode(insets))
   }
 
   // iPhone Duo unfolded in portrait: the status bar sits only in the top-right
@@ -343,7 +362,19 @@ final class NativeTabBarController: UITabBarController, UITabBarControllerDelega
     didSet { if pageHidesStatusBar != oldValue { statusBarDidChange() } }
   }
   private var mainHidesStatusBar = false {
-    didSet { if mainHidesStatusBar != oldValue { statusBarDidChange() } }
+    didSet {
+      guard mainHidesStatusBar != oldValue else { return }
+      statusBarDidChange()
+      // The top inset was held while the status bar was hidden. Once it is
+      // shown and laid out again, send the real insets, in case they changed
+      // in the meantime (a rotation) without another safe area change.
+      if !mainHidesStatusBar {
+        DispatchQueue.main.async { [weak self] in
+          guard let self, let host = self.safeAreaHost else { return }
+          self.publishSafeArea(host.view.safeAreaInsets, of: host)
+        }
+      }
+    }
   }
 
   private func statusBarDidChange() {
