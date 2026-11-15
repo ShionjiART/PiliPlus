@@ -60,15 +60,18 @@
 ## 离线缓存
 
 - [x] 修复网络不好时缓存「瞬间完成」但视频不完整：下载完核对文件大小，断了自动续传，续传多次仍不完整就标为失败；续传时换了视频流会从头下载（[#15](https://github.com/ShionjiART/PiliPlus/pull/15)）
+- [x] 修复存储空间满等写入出错时，残缺的缓存仍显示「已完成」：现在照常续传，重试几次仍失败就标为失败（[#53](https://github.com/ShionjiART/PiliPlus/pull/53)）
 
 ## 投屏
 
 - [x] 修复 iOS 投屏一直「搜索设备失败」、不弹局域网授权（[#9](https://github.com/ShionjiART/PiliPlus/pull/9)）
 - [x] 支持 AirPlay 投屏，和现有的局域网投屏并存（[#14](https://github.com/ShionjiART/PiliPlus/pull/14)）
+- [x] Android 只开流量时，投屏搜索不再对运营商内网扫描（[#53](https://github.com/ShionjiART/PiliPlus/pull/53)）
 
 ## 关于和更新
 
 - [x] 关于页的源码、提交、问题反馈链接和检查更新改用本仓库：不再提示下载没有 iPhone Duo 适配的原版安装包；刚装上的版本也不会被当成有新版本（[#44](https://github.com/ShionjiART/PiliPlus/pull/44)）
+- [x] iOS 检查更新只打开安装包，不会打开同名的 .sha256 校验文件；没有当前平台的安装包时不提示更新（[#53](https://github.com/ShionjiART/PiliPlus/pull/53)）
 
 ## 已知问题
 
