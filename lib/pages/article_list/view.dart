@@ -11,6 +11,7 @@ import 'package:PiliPlus/pages/article_list/controller.dart';
 import 'package:PiliPlus/pages/article_list/widgets/item.dart';
 import 'package:PiliPlus/utils/date_utils.dart';
 import 'package:PiliPlus/utils/grid.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:PiliPlus/utils/num_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:get/get.dart';
@@ -70,7 +71,10 @@ class _ArticleListPageState extends State<ArticleListPage> with GridMixin {
   @override
   Widget get gridSkeleton => SliverPadding(
     padding: EdgeInsets.only(
-      top: padding.top + kToolbarHeight + 120,
+      top:
+          IOSNativeTabBar.appBarTop(context, safeTop: padding.top) +
+          kToolbarHeight +
+          120,
     ),
     sliver: super.gridSkeleton,
   );
@@ -114,7 +118,9 @@ class _ArticleListPageState extends State<ArticleListPage> with GridMixin {
           margin: EdgeInsets.only(
             left: 12 + padding.left,
             right: 12,
-            top: padding.top + kToolbarHeight,
+            top:
+                IOSNativeTabBar.appBarTop(context, safeTop: padding.top) +
+                kToolbarHeight,
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,

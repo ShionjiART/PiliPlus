@@ -159,10 +159,17 @@ final class NativeTabBarController: UITabBarController, UITabBarControllerDelega
         }
         if traitCollection.verticalBarEdge == .unspecified && topCorner {
           let bar = view.edgeInsets(for: .bar(onEdge: UIRectEdge.top, extent: Self.topBarExtent))
+          // UIKit centers a top bar in the status bar row but keeps it at
+          // least some distance from the top edge; a tall bar shows that
+          // distance. Dart places bars of other heights (an app bar is 56)
+          // the same way.
+          let tall = view.edgeInsets(for: .bar(onEdge: UIRectEdge.top, extent: 64))
           region = [
             "height": min(view.safeAreaInsets.top, window.safeAreaInsets.top),
             "top": bar.top, "left": bar.left, "right": bar.right,
             "extent": Self.topBarExtent,
+            "center": bar.top + Self.topBarExtent / 2,
+            "minTop": tall.top,
           ]
         }
         guard region != topBarRegion else { return }

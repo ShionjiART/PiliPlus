@@ -554,15 +554,18 @@ class _MainAppState extends PopScopeState<MainApp>
         : .horizontal;
     // 延伸到竖状态栏下面（iPhone Duo），否则这一层会按让出竖状态栏后的宽度
     // 裁切，页面里左右滑动的内容画不到竖状态栏下面，见 [RailPageViewport]
-    // 顶部安全区由每个页面自己让开：iPhone Duo 展开竖屏时首页要画进状态栏
-    // 那一行（见 [_updateHomeTop]）。各种布局下结构都一样，旋转或展开时页面
+    // 顶部安全区由每个页面自己让开：iPhone Duo 展开竖屏时首页、动态、我的
+    // 把顶部那一行画进状态栏那一行（见 [_updateHomeTop]、
+    // [MainController.homeTopBar]）。各种布局下结构都一样，旋转或展开时页面
     // 状态不会丢
     final pages = _mainController.navigationBars
         .map(
           (i) => RailPagePadding(
             child: Padding(
               padding: .only(
-                top: i == .home && _mainController.homeTopInStatusBar
+                top:
+                    _mainController.homeTopInStatusBar &&
+                        (i == .home || i == .dynamics || i == .mine)
                     ? 0.0
                     : _padding.top,
               ),
