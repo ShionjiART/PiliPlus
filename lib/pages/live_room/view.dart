@@ -46,6 +46,7 @@ import 'package:PiliPlus/utils/extension/num_ext.dart';
 import 'package:PiliPlus/utils/extension/size_ext.dart';
 import 'package:PiliPlus/utils/extension/theme_ext.dart';
 import 'package:PiliPlus/utils/image_utils.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:PiliPlus/utils/max_screen_size.dart';
 import 'package:PiliPlus/utils/mobile_observer.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
@@ -488,7 +489,12 @@ class _LiveRoomPageState extends State<LiveRoomPage>
     final videoHeight = isFullScreen
         ? maxHeight - (isWindowMode && !isPortrait ? 0 : padding.top)
         : height;
-    final bottomHeight = maxHeight - padding.top - height - kToolbarHeight;
+    // 展开竖屏时标题栏在状态栏那一行里（iPhone Duo），按它的底边计算
+    final bottomHeight =
+        maxHeight -
+        IOSNativeTabBar.appBarTop(context, safeTop: padding.top) -
+        height -
+        kToolbarHeight;
     return Column(
       children: [
         SizedBox(

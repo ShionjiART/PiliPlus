@@ -14,6 +14,7 @@ import 'package:PiliPlus/utils/extension/get_ext.dart';
 import 'package:PiliPlus/utils/extension/num_ext.dart';
 import 'package:PiliPlus/utils/extension/size_ext.dart';
 import 'package:PiliPlus/utils/image_utils.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:get/get.dart';
@@ -40,7 +41,9 @@ class _SearchTrendingPageState extends State<SearchTrendingPage> {
     final maxWidth = size.width - padding.horizontal;
     final width = size.isPortrait ? maxWidth : min(640.0, maxWidth * 0.6);
     final height = width * 528 / 1125;
-    _offset = height - 56 - padding.top;
+    // 展开竖屏时标题栏在状态栏那一行里（iPhone Duo），按它的底边计算
+    _offset =
+        height - 56 - IOSNativeTabBar.appBarTop(context, safeTop: padding.top);
     return Material(
       child: Stack(
         children: [

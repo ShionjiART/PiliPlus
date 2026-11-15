@@ -17,6 +17,7 @@ import 'package:PiliPlus/pages/fav_detail/controller.dart';
 import 'package:PiliPlus/pages/fav_detail/widget/fav_video_card.dart';
 import 'package:PiliPlus/utils/bili_utils.dart';
 import 'package:PiliPlus/utils/grid.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:PiliPlus/utils/request_utils.dart';
 import 'package:PiliPlus/utils/share_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
@@ -363,7 +364,10 @@ class _FavDetailPageState extends State<FavDetailPage>
     return FlexibleSpaceBar(
       background: Padding(
         padding: EdgeInsets.only(
-          top: kToolbarHeight + padding.top + 10,
+          top:
+              kToolbarHeight +
+              IOSNativeTabBar.appBarTop(context, safeTop: padding.top) +
+              10,
           left: 12 + padding.left,
           right: 12,
           bottom: 7,

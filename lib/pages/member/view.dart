@@ -43,6 +43,7 @@ import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:PiliPlus/utils/extension/get_ext.dart';
+import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:extended_nested_scroll_view/extended_nested_scroll_view.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -99,7 +100,11 @@ class _MemberPageState extends State<MemberPage> {
             key: _userController.scrollKey,
             scrollBehavior: const NoOverscrollIndicator(),
             pinnedHeaderSliverHeightBuilder: () =>
-                kToolbarHeight + MediaQuery.viewPaddingOf(context).top,
+                kToolbarHeight +
+                IOSNativeTabBar.appBarTop(
+                  context,
+                  safeTop: MediaQuery.viewPaddingOf(context).top,
+                ),
             headerSliverBuilder: (context, innerBoxIsScrolled) {
               if (response != null) {
                 return [
