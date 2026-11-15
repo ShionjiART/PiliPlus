@@ -42,6 +42,7 @@
 - [x] 竖栏头像加载失败后会重新加载，不再一直显示占位图；切换底部标签时页面不再闪一下（[#55](https://github.com/ShionjiART/PiliPlus/pull/55)）
 - [x] 动态详情页顶部不再空出一条：作者直接在最上面，往上滑过作者后顶栏才浮出来，标签栏停在顶栏下面（[#33](https://github.com/ShionjiART/PiliPlus/pull/33)）
 - [x] 音乐详情页顶部也不再空出一条：歌曲卡片直接在最上面，往上滑过后顶栏才浮出来，评论栏停在顶栏下面（[#41](https://github.com/ShionjiART/PiliPlus/pull/41)）
+- [x] 动态详情和音乐页的顶栏在浮动和普通之间切换时，不再重建页面、丢失滚动位置（[#56](https://github.com/ShionjiART/PiliPlus/pull/56)）
 - [x] 合上时视频页暂停后往上滑、播放器收成一条工具栏，右边的 ⋮ 不再被摄像头挡住：按钮和播放器控件一样避开左右安全区（[#40](https://github.com/ShionjiART/PiliPlus/pull/40)）
 - [x] 移植 [Stasert](https://github.com/Stasert) 的竖栏导航等功能：能用的都已移植，其余几项决定不移植，逐项记录见 [#2](https://github.com/ShionjiART/PiliPlus/issues/2)
 
