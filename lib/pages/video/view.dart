@@ -340,6 +340,8 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
   @override
   void dispose() {
     IOSNativeTabBar.verticalBarHidden.removeListener(_onVerticalBarHidden);
+    // 没经过 didPop 就被移除时（例如被替换成别的页面）交还竖状态栏
+    IOSNativeTabBar.releaseVerticalBar(this);
     plPlayerController
       ?..removeStatusLister(playerListener)
       ..removePositionListener(positionListener);
@@ -376,14 +378,16 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     super.dispose();
   }
 
-  // iPhone Duo：视频页隐藏竖状态栏，内容铺满竖状态栏的位置
+  // iPhone Duo：视频页隐藏竖状态栏，内容铺满竖状态栏的位置。隐藏是全局状态，
+  // 只由最上层的视频页来写，被弹出或被盖住的页面只交还，见 VerticalBarOwner
   bool _isOnTop = false;
 
   void _updateVerticalBar() {
-    IOSNativeTabBar.setHidesVerticalBar(
-      _isOnTop,
-      statusBar: _isOnTop && _fillTop,
-    );
+    if (_isOnTop) {
+      IOSNativeTabBar.claimVerticalBar(this, statusBar: _fillTop);
+    } else {
+      IOSNativeTabBar.releaseVerticalBar(this);
+    }
   }
 
   /// iPhone Duo 展开竖屏：状态栏在顶部，视频页隐藏它，播放器铺满顶部，
@@ -549,7 +553,8 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
         ? ThemeUtils.darkTheme
         : Theme.of(context);
 
-    _updateVerticalBar();
+    // 被盖住的视频页在开合、旋转时也会走到这里，不能去改竖状态栏
+    if (_isOnTop) _updateVerticalBar();
   }
 
   bool removeAppBar(bool isFullScreen) =>

@@ -27,6 +27,7 @@
 - [x] 之前手动打开过「横屏适配」的用户，升级后仍保持打开
 - [x] 修复真机合上时启动卡在启动画面
 - [x] 视频页偶尔右侧留出空白（时间和 Wi-Fi 没隐藏）：每次都和系统重新同步竖状态栏状态，回到前台时重新确认（[#18](https://github.com/ShionjiART/PiliPlus/pull/18)）
+- [x] 修复从相关视频返回后竖状态栏重新出现，以及开合时被盖住的视频页把竖状态栏改回显示；首页上打开大图时系统标签栏也会隐藏（[#57](https://github.com/ShionjiART/PiliPlus/pull/57)）
 - [x] 直接打开的页面也避开竖状态栏，修复通讯录页标签栏伸到竖栏下面（[#4](https://github.com/ShionjiART/PiliPlus/pull/4)）
 - [x] 修复开启「改用侧边栏」后首页搜索栏和头像消失：iOS 26 起的 iPhone 由系统标签栏负责导航，这个设置不再生效并在设置里置灰（普通 iPhone 也适用）（[#19](https://github.com/ShionjiART/PiliPlus/pull/19)）
 - [x] 合上时二级页面在竖状态栏显示返回键；首页等一级页面和视频页不显示，弹窗不影响（[#21](https://github.com/ShionjiART/PiliPlus/pull/21)）。页面左上角的返回键起初保留，后来去掉（[#28](https://github.com/ShionjiART/PiliPlus/pull/28)）
