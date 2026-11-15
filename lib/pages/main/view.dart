@@ -262,9 +262,10 @@ class _MainAppState extends PopScopeState<MainApp>
     if (mounted) setState(_updateNavMode);
   }
 
+  // 系统标签栏的隐藏和恢复由 IOSNativeTabBar.navigationObserver 负责：这里只能
+  // 收到 GetX 页面的通知，图片查看器等其他页面盖在主页上时收不到
   @override
   void didPopNext() {
-    IOSNativeTabBar.setHidden(false);
     _isCurrent = true;
     _syncHomeStatusBar(force: true);
     addObserverMobile(this);
@@ -277,8 +278,6 @@ class _MainAppState extends PopScopeState<MainApp>
 
   @override
   void didPushNext() {
-    // 进入二级页面时隐藏系统标签栏
-    IOSNativeTabBar.setHidden(true);
     _isCurrent = false;
     _syncHomeStatusBar(force: true);
     removeObserverMobile(this);
