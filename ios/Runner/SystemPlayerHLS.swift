@@ -135,6 +135,8 @@ enum SystemPlayerHLS {
     var info = TrackInfo()
     var colrRange: String?
     var dolbyRange: String?
+    /// Dolby Vision profile from a dvcC/dvvC/dvwC box, if any.
+    var dolbyProfile: Int?
     func u16(_ i: Int) -> Int { Int(b[i]) << 8 | Int(b[i + 1]) }
     func u32(_ i: Int) -> Int { u16(i) << 16 | u16(i + 2) }
     func hex(_ v: Int) -> String { String(v, radix: 16, uppercase: true) }
@@ -201,6 +203,7 @@ enum SystemPlayerHLS {
           let profile = Int(b[body + 2]) >> 1
           let level = (Int(b[body + 2]) & 1) << 5 | Int(b[body + 3]) >> 3
           let compat = Int(b[body + 4]) >> 4
+          dolbyProfile = profile
           let dv = String(format: "dvh1.%02d.%02d", profile, level)
           if info.codecs?.hasPrefix("dv") == true {
             info.codecs = dv  // profile 5: Dolby Vision only
@@ -264,18 +267,31 @@ enum SystemPlayerHLS {
     }
     try walk(start, end)
     if info.width > 0 {
-      // AVPlayer checks VIDEO-RANGE against the bitstream, so the SPS wins;
-      // bilibili's DV and some HDR streams have no `colr` box.
-      info.videoRange =
-        info.spsTransfer.map(range(transfer:)) ?? colrRange ?? dolbyRange ?? "SDR"
+      if dolbyProfile == 5 {
+        // Dolby Vision profile 5 is always PQ (Apple's HLS authoring spec
+        // declares dvh1.05 variants as PQ). Its SPS often signals the transfer
+        // as unspecified (x265's Dolby Vision mode writes 2), which must not
+        // turn the variant into SDR.
+        info.videoRange = "PQ"
+      } else {
+        // AVPlayer checks VIDEO-RANGE against the bitstream, so a transfer
+        // signalled in the SPS wins; bilibili's DV and some HDR streams have
+        // no `colr` box.
+        info.videoRange =
+          info.spsTransfer.flatMap(range(transfer:)) ?? colrRange ?? dolbyRange ?? "SDR"
+      }
     }
     return info
   }
 
-  private static func range(transfer: Int) -> String {
+  /// VIDEO-RANGE for an ITU-T H.273 transfer characteristic, or nil when the
+  /// stream leaves it open (0 and 3 are reserved, 2 is unspecified), so the
+  /// next source of the range is used.
+  private static func range(transfer: Int) -> String? {
     switch transfer {
     case 16: return "PQ"
     case 18: return "HLG"
+    case 0, 2, 3: return nil
     default: return "SDR"
     }
   }
