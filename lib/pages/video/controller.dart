@@ -2058,7 +2058,7 @@ class VideoDetailController extends GetxController
         cid: cid.value,
         objectId: epId ?? aid,
         playurlType: epId != null ? 2 : 1,
-        qn: currentVideoQa.value?.code,
+        qn: _castQuality?.code,
         fnval: 4048,
       );
       final data = res.dataOrNull;
@@ -2066,7 +2066,7 @@ class VideoDetailController extends GetxController
       return AirPlayDash.pick(
         data,
         // Unknown: the best there is.
-        quality: currentVideoQa.value?.code ?? VideoQuality.hdrVivid.code,
+        quality: _castQuality?.code ?? VideoQuality.hdrVivid.code,
         mp4Quality: mp4Quality,
         audioQuality: currentAudioQa?.code,
       );
