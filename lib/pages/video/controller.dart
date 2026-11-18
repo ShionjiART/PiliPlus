@@ -61,6 +61,7 @@ import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/connectivity_utils.dart';
 import 'package:PiliPlus/utils/extension/nested_scroll_ext.dart';
 import 'package:PiliPlus/utils/extension/num_ext.dart';
+import 'package:PiliPlus/utils/ios/airplay_helper.dart';
 import 'package:PiliPlus/utils/ios/native_tab_bar.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/path_utils.dart';
@@ -2013,6 +2014,7 @@ class VideoDetailController extends GetxController
         return;
       }
       final url = VideoUtils.getCdnUrl(first.playUrls);
+      final mp4Quality = response.quality;
 
       String? title;
       try {
@@ -2034,10 +2036,43 @@ class VideoDetailController extends GetxController
         parameters: {
           'url': url,
           'title': ?title,
+          if (Platform.isIOS && mp4Quality != null)
+            'quality': AirPlayDash.label(mp4Quality),
         },
+        // An AirPlayDashLoader.
+        arguments: Platform.isIOS ? () => _airPlayDash(mp4Quality) : null,
       );
     } else {
       res.toast();
+    }
+  }
+
+  /// The DASH stream AirPlay casts instead of the MP4 of [mp4Quality], from
+  /// the TV API. A separate request: with `fnval` the TV API returns no MP4,
+  /// which DLNA needs. Made for every AirPlay cast, while the device list is
+  /// open, so that a retry gets new signed URLs. Null when there is none, or
+  /// on failure; AirPlay then casts the MP4.
+  Future<AirPlayDash?> _airPlayDash(int? mp4Quality) async {
+    try {
+      final res = await VideoHttp.tvPlayUrl(
+        cid: cid.value,
+        objectId: epId ?? aid,
+        playurlType: epId != null ? 2 : 1,
+        qn: _castQuality?.code,
+        fnval: 4048,
+      );
+      final data = res.dataOrNull;
+      if (data == null) return null;
+      return AirPlayDash.pick(
+        data,
+        // Unknown: the best there is.
+        quality: _castQuality?.code ?? VideoQuality.hdrVivid.code,
+        mp4Quality: mp4Quality,
+        audioQuality: currentAudioQa?.code,
+      );
+    } catch (_) {
+      // e.g. an unexpected response shape
+      return null;
     }
   }
 }

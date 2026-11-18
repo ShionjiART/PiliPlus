@@ -304,6 +304,7 @@ final class SystemPlayerSession: NSObject {
     return String((parts.isEmpty ? "unknown" : parts.joined(separator: " · ")).prefix(160))
   }
 
+  /// Also used by `probe` and for AirPlay casting (AirPlayPlugin).
   static func track(_ value: Any?) -> DashTrack? {
     guard let map = value as? [String: Any], let s = map["url"] as? String,
       let url = URL(string: s)
