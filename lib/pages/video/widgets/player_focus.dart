@@ -77,7 +77,7 @@ class PlayerFocus extends StatelessWidget {
         ? speedList.where((e) => e > speed).minOrNull
         : speedList.where((e) => e < speed).maxOrNull;
     if (newSpeed != null) {
-      plPlayerController.setPlaybackSpeed(newSpeed);
+      plPlayerController.setPlaybackSpeed(newSpeed, fromMenu: true);
     }
     SmartDialog.showToast('${newSpeed ?? speed}x播放');
   }

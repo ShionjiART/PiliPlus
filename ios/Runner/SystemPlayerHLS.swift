@@ -564,7 +564,7 @@ enum SystemPlayerLocal {
   }
 
   /// The first 1 MB holds ftyp + moov.
-  private static func head(_ url: URL) -> [UInt8] {
+  static func head(_ url: URL) -> [UInt8] {
     guard let handle = try? FileHandle(forReadingFrom: url) else { return [] }
     defer { try? handle.close() }
     return [UInt8](handle.readData(ofLength: 1 << 20))
