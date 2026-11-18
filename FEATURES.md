@@ -56,6 +56,7 @@
 - [x] 系统播放器支持画中画、截图和字幕（[#13](https://github.com/ShionjiART/PiliPlus/pull/13)）
 - [x] 修复部分 HDR 真彩、杜比视界视频无法用系统播放器播放，或在播放信息里显示成 SDR（[#13](https://github.com/ShionjiART/PiliPlus/pull/13)）
 - [x] 修复 CDN 返回不完整的数据时系统播放器让 App 闪退，现在会改用内置播放器（[#55](https://github.com/ShionjiART/PiliPlus/pull/55)）
+- [x] 修复部分杜比视界 Profile 5 视频用系统播放器播放失败、退回内置播放器后颜色错误；视频文件的色彩信息和码流不一致、AV1 HDR 没有色彩信息时，不再播放失败或被当成普通画质；解析异常数据时不再闪退（[#63](https://github.com/ShionjiART/PiliPlus/pull/63)）
 - [x] 离线缓存的 HDR、杜比视界视频也用系统播放器播放（[#36](https://github.com/ShionjiART/PiliPlus/pull/36)）
 - [x] 「所有视频」模式下尽量都用系统播放器（包括普通画质的 HEVC 和离线缓存）；系统播放器加载超时或没有画面时自动切回内置播放器（[#38](https://github.com/ShionjiART/PiliPlus/pull/38)）
 - [x] 修复系统播放器超过 2 倍速时一直显示「加载中」、一卡一卡：使用系统播放器时倍速最高 2 倍，倍速菜单和长按倍速都封顶 2 倍（[#49](https://github.com/ShionjiART/PiliPlus/pull/49)）
