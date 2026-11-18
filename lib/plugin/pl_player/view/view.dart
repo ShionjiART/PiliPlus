@@ -520,7 +520,10 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Text(
-                type.label,
+                // HDR on the system player plays without it.
+                plPlayerController.superResolutionUnsupported
+                    ? '不支持'
+                    : type.label,
                 style: const TextStyle(color: Colors.white, fontSize: 13),
               ),
             ),
@@ -746,7 +749,10 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
                     height: 35,
                     padding: const EdgeInsets.only(left: 30),
                     value: speed,
-                    onTap: () => plPlayerController.setPlaybackSpeed(speed),
+                    onTap: () => plPlayerController.setPlaybackSpeed(
+                      speed,
+                      fromMenu: true,
+                    ),
                     child: Text(
                       "${speed}X",
                       style: const TextStyle(color: Colors.white, fontSize: 13),
