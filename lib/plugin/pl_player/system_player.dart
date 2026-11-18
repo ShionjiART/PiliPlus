@@ -53,11 +53,16 @@ class SystemPlayerSource {
     required this.video,
     this.audio,
     this.frameRate,
+    required this.isHdr,
   });
 
   final SystemPlayerTrack video;
   final SystemPlayerTrack? audio;
   final double? frameRate;
+
+  /// HDR / Dolby Vision, which only the system player shows right. SDR plays
+  /// here only because「所有视频」is on, and looks the same on mpv.
+  final bool isHdr;
 }
 
 /// Dart side of `ios/Runner/SystemPlayerPlugin.swift`: AVPlayer for HDR /
@@ -110,6 +115,10 @@ class SystemPlayer {
   late final Stream<(int, int)> size = _of(
     'size',
   ).map((e) => (e['width'] as int, e['height'] as int));
+  late final Stream<bool> fastForward = _of('fastForward').map((e) {
+    _canPlayFastForward = e['value'] as bool;
+    return _canPlayFastForward;
+  });
 
   Duration _lastPosition = Duration.zero;
   DateTime _lastPositionAt = DateTime.now();
@@ -117,9 +126,16 @@ class SystemPlayer {
   bool _playing = false;
   bool _buffering = false;
   double _rate = 1;
+  bool _canPlayFastForward = false;
 
   bool get isPlaying => _playing;
   double get rate => _rate;
+
+  /// Whether AVPlayer can play the current item faster than 2x
+  /// (`AVPlayerItem.canPlayFastForward`). Downloads can once they are ready;
+  /// online videos (HLS without an I-frame playlist) never can. Kept up to
+  /// date while [fastForward] is listened to.
+  bool get canPlayFastForward => _canPlayFastForward;
 
   /// Most media time [currentPosition] runs ahead of the last native update.
   /// Updates come every 200 ms of media time, so this only bridges a late one;
@@ -180,14 +196,19 @@ class SystemPlayer {
   static const unsupported = 'unsupported';
 
   /// Returns an error message, [cancelled], [unsupported], or null on success.
+  /// [bufferSec] is the「缓冲时长」setting: the native side buffers that much
+  /// playing time ahead, kept within 30–60 s.
   Future<String?> load(
     SystemPlayerSource source, {
     required Map<String, String> headers,
     Duration? start,
+    double? bufferSec,
   }) {
     _lastPosition = start ?? Duration.zero;
     _lastPositionAt = DateTime.now();
     _duration = Duration.zero;
+    // Not known for the new item until AVPlayer has it ready.
+    _canPlayFastForward = false;
     return _channel.invokeMethod<String>('load', {
       'id': id,
       'video': source.video.toMap(),
@@ -195,6 +216,7 @@ class SystemPlayer {
       'frameRate': ?source.frameRate,
       'headers': headers,
       'startMs': start?.inMilliseconds ?? 0,
+      'bufferSec': ?bufferSec,
     });
   }
 
@@ -235,4 +257,25 @@ class SystemPlayer {
         'codec': codec,
       }) ??
       true;
+
+  /// [video]'s `codecs`, `supplementalCodecs` and `videoRange` (SDR / PQ /
+  /// HLG), read from its init section as [load] would, without playing it:
+  /// one range request online, the file head offline. For mpv's Dolby Vision
+  /// handling, which mpv waits for. null on any error, or when it takes too
+  /// long (the native side gives up after 2 s).
+  static Future<Map<String, Object?>?> probe(
+    SystemPlayerTrack video, {
+    required Map<String, String> headers,
+  }) async {
+    try {
+      return await _channel
+          .invokeMapMethod<String, Object?>('probe', {
+            'video': video.toMap(),
+            'headers': headers,
+          })
+          .timeout(const Duration(seconds: 3));
+    } catch (_) {
+      return null;
+    }
+  }
 }

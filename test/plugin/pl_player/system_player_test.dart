@@ -62,9 +62,12 @@ void main() {
     const events = EventChannel('piliplus/system_player/events');
     late MockStreamHandlerEventSink sink;
 
+    final calls = <MethodCall>[];
+
     setUpAll(() {
       messenger
         ..setMockMethodCallHandler(channel, (call) async {
+          calls.add(call);
           if (call.method == 'create') return 7;
           return null;
         })
@@ -131,6 +134,108 @@ void main() {
       for (final s in subs) {
         await s.cancel();
       }
+    });
+
+    test('canPlayFastForward follows the item and resets on load', () async {
+      final player = await SystemPlayer.create();
+      final values = <bool>[];
+      final sub = player.fastForward.listen(values.add);
+      await pumpEventQueue();
+      expect(player.canPlayFastForward, isFalse);
+
+      // A download, once ready.
+      await emit('fastForward', {'value': false});
+      await emit('fastForward', {'value': true});
+      expect(values, [false, true]);
+      expect(player.canPlayFastForward, isTrue);
+
+      // The next item is not known to play faster than 2x until it is ready.
+      const source = SystemPlayerSource(
+        video: SystemPlayerTrack(
+          url: 'https://a/v.m4s',
+          indexEnd: 1,
+          bandwidth: 1,
+        ),
+        isHdr: false,
+      );
+      await player.load(source, headers: const {}, bufferSec: 16);
+      expect(player.canPlayFastForward, isFalse);
+
+      // Another session's events do not count.
+      sink.success({'id': 8, 'type': 'fastForward', 'value': true});
+      await pumpEventQueue();
+      expect(player.canPlayFastForward, isFalse);
+
+      await sub.cancel();
+    });
+
+    test('load passes the buffer setting', () async {
+      final player = await SystemPlayer.create();
+      const source = SystemPlayerSource(
+        video: SystemPlayerTrack(
+          url: 'https://a/v.m4s',
+          indexEnd: 1,
+          bandwidth: 1,
+        ),
+        isHdr: true,
+      );
+      calls.clear();
+      await player.load(source, headers: const {}, bufferSec: 45.5);
+      await player.load(source, headers: const {});
+      final loads = calls.where((c) => c.method == 'load').toList();
+      expect(loads, hasLength(2));
+      expect((loads[0].arguments as Map)['bufferSec'], 45.5);
+      expect((loads[1].arguments as Map).containsKey('bufferSec'), isFalse);
+    });
+  });
+
+  group('SystemPlayer.probe', () {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    const channel = MethodChannel('piliplus/system_player');
+    const video = SystemPlayerTrack(
+      url: 'https://a/v.m4s',
+      indexEnd: 1234,
+      bandwidth: 5,
+    );
+    const headers = {'Referer': 'https://www.bilibili.com'};
+
+    tearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+    test('passes the track and headers and returns what was read', () async {
+      MethodCall? probe;
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        probe = call;
+        return {
+          'codecs': 'hvc1.2.4.L153.90',
+          'supplementalCodecs': 'dvh1.08.06/db4h',
+          'videoRange': 'HLG',
+        };
+      });
+      final result = await SystemPlayer.probe(video, headers: headers);
+      expect(probe?.method, 'probe');
+      expect(probe?.arguments, {'video': video.toMap(), 'headers': headers});
+      expect(result, {
+        'codecs': 'hvc1.2.4.L153.90',
+        'supplementalCodecs': 'dvh1.08.06/db4h',
+        'videoRange': 'HLG',
+      });
+    });
+
+    test('null when nothing was read or the call fails', () async {
+      messenger.setMockMethodCallHandler(channel, (_) async => null);
+      expect(await SystemPlayer.probe(video, headers: headers), isNull);
+
+      messenger.setMockMethodCallHandler(
+        channel,
+        (_) async => throw PlatformException(code: 'failed'),
+      );
+      expect(await SystemPlayer.probe(video, headers: headers), isNull);
+
+      // No native side at all (MissingPluginException).
+      messenger.setMockMethodCallHandler(channel, null);
+      expect(await SystemPlayer.probe(video, headers: headers), isNull);
     });
   });
 }

@@ -24,6 +24,7 @@ import 'package:PiliPlus/plugin/pl_player/models/double_tap_type.dart';
 import 'package:PiliPlus/plugin/pl_player/models/duration.dart';
 import 'package:PiliPlus/plugin/pl_player/models/fullscreen_mode.dart';
 import 'package:PiliPlus/plugin/pl_player/models/heart_beat_type.dart';
+import 'package:PiliPlus/plugin/pl_player/models/mpv_plan.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_repeat.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
 import 'package:PiliPlus/plugin/pl_player/models/video_fit_type.dart';
@@ -91,6 +92,14 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   SystemPlayerSource? _systemSource;
   Volume? _lastVolume;
   int? _lastRotate;
+
+  /// [setDataSource]'s `onInit` (e.g. loads the subtitle), run again when the
+  /// video moves from the system player to mpv.
+  VoidCallback? _onInit;
+
+  /// [setDataSource]'s `mpvPlan`, asked whenever mpv is about to open the
+  /// video (iOS: HDR and Dolby Vision, see [MpvPlan]).
+  MpvPlanner? _mpvPlanner;
 
   // Position / buffer of whichever engine plays, for code that used to listen
   // to mpv's streams directly (e.g. SponsorBlock).
@@ -189,8 +198,8 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
 
   late double lastPlaybackSpeed = 1.0;
 
-  /// The speed the user chose. The system player plays it capped at
-  /// [systemPlayerMaxSpeed]; [playbackSpeed] is the speed actually used.
+  /// The speed the user chose. The system player plays it capped (see
+  /// [_clampSpeed]); [playbackSpeed] is the speed actually used.
   final RxDouble _playbackSpeed = Pref.playSpeedDefault.obs;
   late final RxDouble _longPressSpeed = Pref.longPressSpeedDefault.obs;
 
@@ -245,9 +254,13 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
 
   String get bvid => _bvid!;
 
-  /// 视频播放速度：实际生效的倍速。使用系统播放器时最高 2 倍，
+  /// 视频播放速度：实际生效的倍速。使用系统播放器时最高 2 倍（离线视频 3 倍），
   /// 用户选的更高倍速换回 mpv 后恢复。
   double get playbackSpeed => _clampSpeed(_playbackSpeed.value);
+
+  /// The speed the user chose, which the next video starts with (the system
+  /// player may cap it, see [playbackSpeed]).
+  double get chosenPlaybackSpeed => _playbackSpeed.value;
 
   // 长按倍速
   double get longPressSpeed => _longPressSpeed.value;
@@ -819,6 +832,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     bool autoFullScreenFlag = false,
     int? rotate,
     SystemPlayerSource? systemSource,
+    MpvPlanner? mpvPlan,
   }) async {
     final gen = ++_sourceGen;
     bool isStale() => gen != _sourceGen;
@@ -854,11 +868,28 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       }
       _lastVolume = volume;
       _lastRotate = rotate;
+      _onInit = onInit;
+      _mpvPlanner = mpvPlan;
       // 配置Player 音轨、字幕等等
       if (systemSource == null ||
           !await _openSystemPlayer(systemSource, seekTo, gen)) {
         // A newer call shares the system player: closing it here would end
         // the newer video's load.
+        if (isStale()) return;
+        final failure = systemSource == null ? null : _systemFailureNote;
+        // A system player that tried this video may have read its stream,
+        // so it closes after the plan; an earlier video's closes now.
+        final tried = systemSource == null ? null : _systemPlayer;
+        if (tried == null) await _closeSystemPlayer();
+        // The plan may read the stream first. Meanwhile mpv must not keep
+        // the previous video, which a play command would resume under this
+        // video's ids.
+        if (_videoPlayerController case final mpv?
+            when _mpvPlanner != null && mpv.state.playlist.medias.isNotEmpty) {
+          await mpv.stop();
+          if (isStale()) return;
+        }
+        final plan = await _planMpv(tried);
         if (isStale()) return;
         await _closeSystemPlayer();
         await _createVideoController(
@@ -867,6 +898,9 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
           volume,
           rotate,
           isStale: isStale,
+          plan: plan,
+          note: failure,
+          noteTime: const Duration(seconds: 5),
         );
       }
 
@@ -925,7 +959,34 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   late final isAnim = _pgcType == 1 || _pgcType == 4;
   late final Rx<SuperResolutionType> superResolutionType =
       (isAnim ? Pref.superResolutionType : SuperResolutionType.disable).obs;
+
+  /// Super resolution is mpv's (shaders), and an HDR video stays on the
+  /// system player, as mpv cannot show it right.
+  bool get superResolutionUnsupported =>
+      usingSystemPlayer.value && _systemSource?.isHdr != false;
+
   Future<void> setShader([SuperResolutionType? type, NativePlayer? pp]) async {
+    // Picked while AVPlayer plays, which has no shaders: SDR looks the same
+    // on mpv, so it moves there.
+    if (type != null &&
+        type != .disable &&
+        pp == null &&
+        usingSystemPlayer.value) {
+      final mpv = _videoPlayerController;
+      if (superResolutionUnsupported || mpv == null) {
+        SmartDialog.showToast('系统播放器不支持超分辨率');
+        return;
+      }
+      // The idle mpv keeps the shaders for the file it opens next.
+      await setShader(type, mpv);
+      if (_canSwitchToMpv) {
+        await _continueWithMpv(
+          resume: playerStatus.isPlaying,
+          note: '超分辨率改用内置播放器',
+        );
+      }
+      return;
+    }
     if (type == null) {
       type = superResolutionType.value;
     } else {
@@ -1040,7 +1101,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     return player;
   }
 
-  static const _systemPlayerHeaders = {
+  static const systemPlayerHeaders = {
     'User-Agent': BrowserUa.pc,
     'Referer': HttpString.baseUrl,
   };
@@ -1080,6 +1141,11 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   /// An error right after that is what stopped it.
   DateTime? _systemStoppedAt;
 
+  /// Why [_openSystemPlayer] could not open its source, if the user should
+  /// know. Shown when mpv takes over, together with what mpv then plays
+  /// differently ([MpvPlan.toast]).
+  String? _systemFailureNote;
+
   /// Plays [source] with the iOS system player. Returns false (and leaves the
   /// system player closed) if it could not be opened, so mpv takes over.
   /// Once [setDataSource] call [gen] is superseded, it returns false without
@@ -1090,6 +1156,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     int gen,
   ) async {
     bool isStale() => gen != _sourceGen;
+    _systemFailureNote = null;
     isBuffering.value = false;
     _heartDuration = 0;
     danmakuController?.clear();
@@ -1106,8 +1173,9 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     _systemSource = source;
     final error = await player.load(
       source,
-      headers: _systemPlayerHeaders,
+      headers: systemPlayerHeaders,
       start: seekTo,
+      bufferSec: Pref.bufferSec,
     );
     if (isStale()) return false;
     if (error != null) {
@@ -1119,10 +1187,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
           _playerCount == 0) {
         return false;
       }
-      SmartDialog.showToast(
-        '系统播放器无法播放，已改用内置播放器\n$error',
-        displayTime: const Duration(seconds: 5),
-      );
+      _systemFailureNote = '系统播放器无法播放，已改用内置播放器\n$error';
       return false;
     }
     _systemLoadedGen = gen;
@@ -1154,41 +1219,90 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     await player.dispose();
   }
 
-  /// The system player failed mid-playback: continue with mpv where it stopped.
-  Future<void> _fallbackToMpv(String error) async {
-    // While a newer source loads, errors come from the item it replaces; the
-    // load itself reports a failure of the new one.
-    if (!usingSystemPlayer.value ||
-        _playerCount == 0 ||
-        _systemLoadedGen != _sourceGen) {
-      return;
+  /// The system player plays the newest source, so mpv can take over from it.
+  /// While a newer source loads, the system player still has the item that
+  /// source replaces.
+  bool get _canSwitchToMpv =>
+      usingSystemPlayer.value &&
+      _playerCount != 0 &&
+      _systemLoadedGen == _sourceGen &&
+      _movingToMpvGen != _sourceGen;
+
+  /// The [setDataSource] call whose video [_continueWithMpv] is moving to
+  /// mpv. The system player still plays while mpv's playback is planned, and
+  /// another error or menu pick meanwhile must not start a second move.
+  int? _movingToMpvGen;
+
+  /// Asks [setDataSource]'s `mpvPlan` how mpv plays the current video. [system]
+  /// is the system player while it still has this video (loaded, or failed
+  /// to), as it may have read the stream already.
+  Future<MpvPlan?> _planMpv(SystemPlayer? system) async {
+    final planner = _mpvPlanner;
+    if (planner == null || _playerCount == 0) return null;
+    try {
+      return await planner(system?.info);
+    } catch (e) {
+      if (kDebugMode) debugPrint('mpv plan failed: $e');
+      return null;
     }
+  }
+
+  /// Closes the system player and continues the current video with mpv where
+  /// it is, playing if [resume]. [note] is shown once the system player is
+  /// closed. Callers check [_canSwitchToMpv] first.
+  Future<void> _continueWithMpv({
+    required bool resume,
+    required String note,
+    Duration? noteTime,
+  }) async {
     final gen = _sourceGen;
     // A newer source took over meanwhile: it sets up the players itself.
     bool isStale() => gen != _sourceGen || _playerCount == 0;
-    if (kDebugMode) debugPrint('system player error: $error');
+    // Planned before the system player closes, as it knows the stream.
+    _movingToMpvGen = gen;
+    final plan = await _planMpv(_systemPlayer);
+    if (_movingToMpvGen == gen) _movingToMpvGen = null;
+    if (isStale()) return;
     final position = currentPosition;
-    // Keep playing only if it was playing, or the error just stopped it.
-    final stoppedAt = _systemStoppedAt;
-    final resume =
-        playerStatus.isPlaying ||
-        (stoppedAt != null &&
-            DateTime.now().difference(stoppedAt) < const Duration(seconds: 1));
     await _closeSystemPlayer();
     if (isStale()) return;
-    SmartDialog.showToast(
-      '系统播放器出错，已改用内置播放器\n$error',
-      displayTime: const Duration(seconds: 5),
-    );
     await _createVideoController(
       dataSource,
       position,
       _lastVolume,
       _lastRotate,
       isStale: isStale,
+      plan: plan,
+      note: note,
+      noteTime: noteTime,
     );
     if (isStale()) return;
     await _initializePlayer(autoPlay: resume);
+    if (isStale()) return;
+    // mpv may have kept the speed from an earlier video, so the danmaku may
+    // still move at the system player's speed.
+    _updateDanmakuSpeed(_engineRate);
+    // mpv had no file while the system player played, so it has no subtitle.
+    _onInit?.call();
+  }
+
+  /// The system player failed mid-playback: continue with mpv where it stopped.
+  Future<void> _fallbackToMpv(String error) async {
+    // While a newer source loads, errors come from the item it replaces; the
+    // load itself reports a failure of the new one.
+    if (!_canSwitchToMpv) return;
+    if (kDebugMode) debugPrint('system player error: $error');
+    // Keep playing only if it was playing, or the error just stopped it.
+    final stoppedAt = _systemStoppedAt;
+    final resume =
+        playerStatus.isPlaying ||
+        (stoppedAt != null &&
+            DateTime.now().difference(stoppedAt) < const Duration(seconds: 1));
+    await _continueWithMpv(
+      resume: resume,
+      note: '系统播放器出错，已改用内置播放器\n$error',
+      noteTime: const Duration(seconds: 5),
+    );
   }
 
   void _onSystemPlayingChanged(bool playing) {
@@ -1210,6 +1324,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       player.buffered.listen(_onBuffered),
       player.buffering.listen(_onBuffering),
       player.error.listen(_fallbackToMpv),
+      player.fastForward.listen(_onSystemFastForward),
     ];
   }
 
@@ -1217,12 +1332,17 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   late final liveBuffer = Pref.initLiveBuffer();
 
   // 配置播放器
+  /// [plan] (iOS) may replace [dataSource] and adds per-file options. [note]
+  /// is shown together with the plan's toast, for [noteTime] if given.
   Future<void> _createVideoController(
     DataSource dataSource,
     Duration? seekTo,
     Volume? volume,
     int? rotate, {
     bool Function()? isStale,
+    MpvPlan? plan,
+    String? note,
+    Duration? noteTime,
   }) async {
     isBuffering.value = false;
     _heartDuration = 0;
@@ -1230,6 +1350,22 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
 
     final player = await _ensurePlayer();
     if (player == null || (isStale?.call() ?? false)) return;
+
+    final toast = [?note, ?plan?.toast].join('\n');
+    if (toast.isNotEmpty) {
+      SmartDialog.showToast(
+        toast,
+        displayTime:
+            noteTime ??
+            (plan?.toast == null ? null : const Duration(seconds: 4)),
+      );
+    }
+    if (plan != null) {
+      plan.onUse?.call();
+      if (plan.dataSource case final source?) {
+        dataSource = this.dataSource = source;
+      }
+    }
 
     final Map<String, String> extras = {
       if (dataSource is FileSource)
@@ -1239,6 +1375,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       else
         ...buffer,
       'video-rotate': ?rotate?.toString(),
+      ...?plan?.extras,
     };
 
     String video = dataSource.videoSource;
@@ -1278,8 +1415,9 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
       return _systemPlayer!
           .load(
             _systemSource!,
-            headers: _systemPlayerHeaders,
+            headers: systemPlayerHeaders,
             start: currentPosition,
+            bufferSec: Pref.bufferSec,
           )
           .then((_) => _systemPlayer?.play());
     }
@@ -1566,17 +1704,50 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     }
   }
 
-  /// 系统播放器（AVPlayer）在线播放超过 2 倍速时会反复缓冲、一卡一卡的，
-  /// 所以使用系统播放器时倍速最高 2 倍。
+  /// AVPlayer plays every ready item at up to 2x, and faster only when the
+  /// item reports canPlayFastForward. Downloads do; online videos, HLS
+  /// playlists without an I-frame playlist, never do. Faster than 2x AVPlayer
+  /// fakes their playback by pausing, seeking and playing, so it shows
+  /// "loading" all the time. Buffering settings cannot change that.
   static const systemPlayerMaxSpeed = 2.0;
 
-  double _clampSpeed(double speed) =>
-      usingSystemPlayer.value ? min(speed, systemPlayerMaxSpeed) : speed;
+  /// The fastest the system player plays an item that reports
+  /// canPlayFastForward. That does not promise smooth playback: AVPlayer may
+  /// fall back to showing keyframes only, the more likely the faster it plays
+  /// 4K HDR or Dolby Vision. Raise it once that is tried on devices.
+  static const systemPlayerFastForwardMaxSpeed = 3.0;
+
+  /// The fastest the system player plays its current item; null while mpv
+  /// plays.
+  double? get _systemMaxSpeed => !usingSystemPlayer.value
+      ? null
+      : _systemPlayer?.canPlayFastForward == true
+      ? systemPlayerFastForwardMaxSpeed
+      : systemPlayerMaxSpeed;
+
+  double _clampSpeed(double speed) => min(speed, _systemMaxSpeed ?? speed);
 
   /// 倍速菜单里可选的倍速
-  List<double> get speedOptions => usingSystemPlayer.value
-      ? speedList.where((e) => e <= systemPlayerMaxSpeed).toList()
-      : speedList;
+  /// SDR keeps the faster speeds: picking one moves it to mpv (see
+  /// [setPlaybackSpeed]).
+  List<double> get speedOptions => switch (_systemMaxSpeed) {
+    final limit? when _systemSource?.isHdr != false =>
+      speedList.where((e) => e <= limit).toList(),
+    _ => speedList,
+  };
+
+  /// The system player found out whether it can play the item faster than
+  /// 2x (it can tell once the item is ready): play the chosen speed again
+  /// under the new cap.
+  void _onSystemFastForward(bool _) {
+    if (!usingSystemPlayer.value) return;
+    // What shows the speed reads the cap, which is not observable itself.
+    _playbackSpeed.refresh();
+    // Releasing it goes back to the chosen speed under the new cap.
+    if (longPressStatus.value) return;
+    final speed = _playbackSpeed.value;
+    if (_engineRate != _clampSpeed(speed)) setPlaybackSpeed(speed);
+  }
 
   /// 以 [base] 为当前倍速时，长按使用的倍速
   double _longPressSpeedFor(double base) =>
@@ -1588,10 +1759,24 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   );
 
   /// 设置倍速。保存用户选的 [speed]，交给系统播放器时才压到
-  /// [systemPlayerMaxSpeed]，换回 mpv 后仍按原倍速播放。
-  Future<void> setPlaybackSpeed(double speed) async {
-    lastPlaybackSpeed = _playbackSpeed.value;
+  /// 它的上限（[_clampSpeed]），换回 mpv 后仍按原倍速播放。
+  /// [fromMenu]: picked in the speed menu. An SDR video the system player
+  /// cannot play that fast moves to mpv; HDR stays capped, and so does long
+  /// press (each move reloads the video).
+  Future<void> setPlaybackSpeed(double speed, {bool fromMenu = false}) async {
     final rate = _clampSpeed(speed);
+    if (fromMenu &&
+        speed > rate &&
+        _systemSource?.isHdr == false &&
+        _canSwitchToMpv) {
+      // [_initializePlayer] plays it once mpv has the video.
+      _playbackSpeed.value = speed;
+      return _continueWithMpv(
+        resume: playerStatus.isPlaying,
+        note: '倍速超过 ${rate}x，已改用内置播放器',
+      );
+    }
+    lastPlaybackSpeed = _playbackSpeed.value;
 
     if (rate == _engineRate) {
       if (!isLive) _playbackSpeed.value = speed;
@@ -1605,6 +1790,10 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     }
     if (!isLive) _playbackSpeed.value = speed;
     _updatePlaybackState();
+    _updateDanmakuSpeed(rate);
+  }
+
+  void _updateDanmakuSpeed(double rate) {
     if (danmakuController != null) {
       try {
         danmakuController?.updateOption(

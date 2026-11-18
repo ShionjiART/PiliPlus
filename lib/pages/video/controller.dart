@@ -22,6 +22,7 @@ import 'package:PiliPlus/models/common/sponsor_block/action_type.dart';
 import 'package:PiliPlus/models/common/sponsor_block/post_segment_model.dart';
 import 'package:PiliPlus/models/common/sponsor_block/segment_model.dart';
 import 'package:PiliPlus/models/common/sponsor_block/segment_type.dart';
+import 'package:PiliPlus/models/common/super_resolution_type.dart';
 import 'package:PiliPlus/models/common/video/base_quality.dart';
 import 'package:PiliPlus/models/common/video/source_type.dart';
 import 'package:PiliPlus/models/common/video/video_decode_type.dart';
@@ -51,6 +52,7 @@ import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/models/data_status.dart';
 import 'package:PiliPlus/plugin/pl_player/models/data_source.dart';
 import 'package:PiliPlus/plugin/pl_player/models/heart_beat_type.dart';
+import 'package:PiliPlus/plugin/pl_player/models/mpv_plan.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
 import 'package:PiliPlus/plugin/pl_player/subtitle_cues.dart';
 import 'package:PiliPlus/plugin/pl_player/system_player.dart';
@@ -75,7 +77,8 @@ import 'package:collection/collection.dart';
 import 'package:dio/dio.dart' show Options;
 import 'package:extended_nested_scroll_view/extended_nested_scroll_view.dart'
     show ExtendedNestedScrollViewState;
-import 'package:flutter/foundation.dart' show kDebugMode, compute;
+import 'package:flutter/foundation.dart'
+    show kDebugMode, compute, visibleForTesting;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:flutter_volume_controller/flutter_volume_controller.dart';
 import 'package:get/get.dart';
@@ -736,6 +739,43 @@ class VideoDetailController extends GetxController
     129, // HDR Vivid
   };
 
+  /// SDR plays on the system player only because「所有视频」is on, and looks
+  /// the same on mpv, which also has super resolution and plays faster than
+  /// the system player can ([maxSpeed]). Such videos stay on mpv.
+  @visibleForTesting
+  static bool sdrNeedsMpv({
+    required double speed,
+    required double maxSpeed,
+    required SuperResolutionType superResolution,
+  }) => speed > maxSpeed || superResolution != SuperResolutionType.disable;
+
+  /// The super resolution mpv plays the next video with. All pages share one
+  /// player: once it has mpv, [player] is its super resolution, which mpv
+  /// keeps from the first video or from the user's pick since. Before that,
+  /// the player sets up [setting] for anime ([pgcType] 1 or 4) only.
+  @visibleForTesting
+  static SuperResolutionType mpvSuperResolution({
+    required SuperResolutionType? player,
+    required int? pgcType,
+    required SuperResolutionType setting,
+  }) =>
+      player ??
+      (pgcType == 1 || pgcType == 4 ? setting : SuperResolutionType.disable);
+
+  /// [maxSpeed]: the fastest the system player plays this video.
+  bool _sdrNeedsMpv(double maxSpeed) => sdrNeedsMpv(
+    speed: plPlayerController.chosenPlaybackSpeed,
+    maxSpeed: maxSpeed,
+    superResolution: mpvSuperResolution(
+      // mpv is created by setDataSource, which runs after this.
+      player: plPlayerController.videoPlayerController == null
+          ? null
+          : plPlayerController.superResolutionType.value,
+      pgcType: isUgc ? null : pgcType,
+      setting: Pref.superResolutionType,
+    ),
+  );
+
   /// iOS: play with the system player (AVPlayer) instead of mpv when the
   /// settings ask for it. mpv only outputs SDR on iOS, so HDR / Dolby Vision
   /// look wrong there. Returns null to keep mpv.
@@ -754,6 +794,11 @@ class VideoDetailController extends GetxController
     }
     void skip(String reason) {
       if (kDebugMode) debugPrint('system player skipped: $reason ($codecs)');
+    }
+
+    if (!isHdr && _sdrNeedsMpv(PlPlayerController.systemPlayerMaxSpeed)) {
+      skip('SDR above 2x or with super resolution');
+      return null;
     }
 
     // Old FLV / MP4 (durl) streams: no DASH files to build a playlist from,
@@ -791,6 +836,7 @@ class VideoDetailController extends GetxController
       video: video,
       audio: audio,
       frameRate: double.tryParse(firstVideo.frameRate ?? ''),
+      isHdr: isHdr,
     );
   }
 
@@ -799,6 +845,11 @@ class VideoDetailController extends GetxController
   Future<SystemPlayerSource?> _localSystemPlayerSource() async {
     final isHdr = _hdrQualities.contains(entry.preferedVideoQuality);
     if (!(Pref.systemPlayerAll || (isHdr && Pref.systemPlayerHdr))) {
+      return null;
+    }
+    // The system player plays downloads faster than 2x.
+    if (!isHdr &&
+        _sdrNeedsMpv(PlPlayerController.systemPlayerFastForwardMaxSpeed)) {
       return null;
     }
     final dir = path.join(args['dirPath'] as String, entry.typeTag!);
@@ -815,7 +866,10 @@ class VideoDetailController extends GetxController
           (index?['format'] as String?)?.contains('mp4') != true) {
         return null;
       }
-      return SystemPlayerSource(video: SystemPlayerTrack.file(video.path));
+      return SystemPlayerSource(
+        video: SystemPlayerTrack.file(video.path),
+        isHdr: isHdr,
+      );
     }
     final video = File(path.join(dir, PathUtils.videoNameType2));
     final audio = entry.hasDashAudio
@@ -833,11 +887,160 @@ class VideoDetailController extends GetxController
     return SystemPlayerSource(
       video: SystemPlayerTrack.file(video.path),
       audio: audio == null ? null : SystemPlayerTrack.file(audio.path),
+      isHdr: isHdr,
+    );
+  }
+
+  /// What mpv plays instead of Dolby Vision profile 5, which it cannot show
+  /// right: HDR 真彩, or else the best quality that is not HDR. [qualities]
+  /// are those of the DASH videos.
+  @visibleForTesting
+  static int? profile5Replacement(Iterable<int> qualities) =>
+      qualities.contains(VideoQuality.hdr.code)
+      ? VideoQuality.hdr.code
+      : qualities.whereNot(_hdrQualities.contains).maxOrNull;
+
+  /// iOS: how mpv plays HDR and Dolby Vision, which it only shows as SDR
+  /// there (see [MpvPlan]). Asked by the player right before mpv opens
+  /// [source], which plays [video]; [dashVideos] are the DASH videos of all
+  /// qualities. Only Dolby Vision has its stream read, so nothing else waits.
+  Future<MpvPlan?> _mpvPlan(
+    DataSource source,
+    VideoItem video,
+    List<VideoItem>? dashVideos,
+    SystemPlayerInfoReader? systemInfo,
+  ) async {
+    if (plPlayerController.onlyPlayAudio.value) return null;
+    final isFile = source is FileSource;
+    final quality = isFile ? entry.preferedVideoQuality : video.quality.code;
+    final codecs = isFile ? '' : video.codecs ?? '';
+    final dolbyVision =
+        quality == VideoQuality.dolbyVision.code ||
+        codecs.startsWith('dvh1') ||
+        codecs.startsWith('dvhe');
+    Map<String, Object?>? stream;
+    DolbyVisionProfile? profile;
+    if (dolbyVision) {
+      // What the system player read when it tried this video; else read it
+      // here like the system player would (online only from DASH files).
+      try {
+        stream = await systemInfo?.call();
+      } catch (_) {}
+      profile = DolbyVisionProfile.of(stream);
+      if (profile == null && (isFile || dashVideos != null)) {
+        stream = await SystemPlayer.probe(
+          isFile
+              ? SystemPlayerTrack.file(source.videoSource)
+              : SystemPlayerTrack.fromItem(video, source.videoSource),
+          headers: PlPlayerController.systemPlayerHeaders,
+        );
+        profile = DolbyVisionProfile.of(stream);
+      }
+      if (kDebugMode) {
+        final read = [
+          stream?['codecs'] ?? stream?['videoCodecs'],
+          stream?['supplementalCodecs'],
+          stream?['videoRange'],
+        ].nonNulls.join(', ');
+        debugPrint('mpv: Dolby Vision ${profile?.name} ($read)');
+      }
+      if (profile == .p5 && dashVideos != null) {
+        if (_profile5Plan(source, dashVideos) case final plan?) return plan;
+      }
+    }
+    final extras = MpvPlan.extrasFor(
+      hdr:
+          dolbyVision ||
+          _hdrQualities.contains(quality) ||
+          const {'PQ', 'HLG'}.contains(stream?['videoRange']),
+      profile84: profile == .p84,
+      toneMapping: Pref.toneMapping,
+    );
+    return extras.isEmpty ? null : MpvPlan(extras: extras);
+  }
+
+  /// What this page chose while mpv plays [_profile5Plan]'s stand-in, and the
+  /// stand-in's quality and decode format. The choice comes back whenever the
+  /// player is set up again, so the system player still gets Dolby Vision
+  /// (mpv swaps it again), and casting asks for it.
+  ({
+    VideoItem video,
+    String? url,
+    VideoDecodeFormatType decode,
+    VideoQuality? quality,
+    (VideoQuality, VideoDecodeFormatType) standIn,
+  })?
+  _profile5Chosen;
+
+  /// The quality to cast: the page's Dolby Vision choice, not the stand-in
+  /// mpv plays instead.
+  VideoQuality? get _castQuality =>
+      _profile5Chosen?.quality ?? currentVideoQa.value;
+
+  void _restoreProfile5Chosen() {
+    if (_profile5Chosen case final chosen?) {
+      _profile5Chosen = null;
+      firstVideo = chosen.video;
+      videoUrl = chosen.url;
+      currentDecodeFormats = chosen.decode;
+      currentVideoQa.value = chosen.quality;
+    }
+  }
+
+  /// Dolby Vision profile 5 on mpv: [profile5Replacement] plays instead. The
+  /// remembered quality stays, so the next video is Dolby Vision again where
+  /// it can be, and so does this page's choice ([_profile5Chosen]).
+  MpvPlan? _profile5Plan(DataSource source, List<VideoItem> dashVideos) {
+    final quality = profile5Replacement(dashVideos.map((e) => e.id));
+    if (quality == null) return null;
+    final videos = dashVideos.where((e) => e.id == quality).toList();
+    final decode = VideoUtils.selectCodec(
+      videos.map((e) => e.codecs ?? ''),
+      preferCodecs,
+    );
+    final video = videos.firstWhere(
+      (e) => decode.codes.any((e.codecs ?? '').startsWith),
+      orElse: () => videos.first,
+    );
+    final url = VideoUtils.getCdnUrl(video.playUrls);
+    final videoQa = VideoQuality.fromCode(quality);
+    return MpvPlan(
+      dataSource: NetworkSource(
+        videoSource: url,
+        audioSource: source.audioSource,
+      ),
+      extras: MpvPlan.extrasFor(
+        hdr: _hdrQualities.contains(quality),
+        toneMapping: Pref.toneMapping,
+      ),
+      toast: '杜比视界 Profile 5 在内置播放器里无法正确显示，已改为${videoQa.desc}',
+      onUse: () {
+        _profile5Chosen ??= (
+          video: firstVideo,
+          url: videoUrl,
+          decode: currentDecodeFormats,
+          quality: currentVideoQa.value,
+          standIn: (videoQa, decode),
+        );
+        firstVideo = video;
+        videoUrl = url;
+        currentDecodeFormats = decode;
+        currentVideoQa.value = videoQa;
+      },
     );
   }
 
   /// 更新画质、音质
   void updatePlayer() {
+    if (_profile5Chosen case final chosen?) {
+      // Only the audio changed: the page's own video stays. A quality or
+      // decode format picked while the stand-in plays is the choice now.
+      if ((this.currentVideoQa.value, currentDecodeFormats) == chosen.standIn) {
+        _restoreProfile5Chosen();
+      } else {
+        _profile5Chosen = null;
+      }
+    }
     final currentVideoQa = this.currentVideoQa.value;
     if (currentVideoQa == null) return;
     _autoPlay.value = true;
@@ -889,23 +1092,29 @@ class VideoDetailController extends GetxController
     bool autoFullScreenFlag = false,
   }) async {
     if (!_ownsPlayer || (!isFileSource && videoUrl == null)) return;
+    _restoreProfile5Chosen();
     Duration? seek = defaultST ?? playedTime;
     if (seek == .zero) seek = null;
     seek ??= getFirstSegment();
     final systemSource = await _systemPlayerSource();
     if (!_ownsPlayer) return;
+    final DataSource source = isFileSource
+        ? FileSource(
+            dir: args['dirPath'],
+            typeTag: entry.typeTag!,
+            isMp4: entry.mediaType == 1,
+            hasDashAudio: entry.hasDashAudio,
+          )
+        : NetworkSource(
+            videoSource: videoUrl!,
+            audioSource: audioUrl,
+          );
+    // As they are now: the plan may be asked later, e.g. when the system
+    // player fails mid-playback.
+    final video = firstVideo;
+    final dashVideos = data.dash?.video;
     await plPlayerController.setDataSource(
-      isFileSource
-          ? FileSource(
-              dir: args['dirPath'],
-              typeTag: entry.typeTag!,
-              isMp4: entry.mediaType == 1,
-              hasDashAudio: entry.hasDashAudio,
-            )
-          : NetworkSource(
-              videoSource: videoUrl!,
-              audioSource: audioUrl,
-            ),
+      source,
       seekTo: seek,
       duration: data.timeLength == null
           ? null
@@ -929,6 +1138,9 @@ class VideoDetailController extends GetxController
       autoFullScreenFlag: autoFullScreenFlag,
       rotate: _rotate,
       systemSource: systemSource,
+      mpvPlan: SystemPlayer.isSupported
+          ? (systemInfo) => _mpvPlan(source, video, dashVideos, systemInfo)
+          : null,
     );
 
     if (isClosed) return;
@@ -1041,6 +1253,8 @@ class VideoDetailController extends GetxController
 
     if (result case Success(:final response)) {
       data = response;
+      // The video is picked again below.
+      _profile5Chosen = null;
       if (data.dash != null) await _supplementVideoQualities();
 
       languages.value = data.language?.items;
@@ -1769,6 +1983,9 @@ class VideoDetailController extends GetxController
           TextButton(
             onPressed: () {
               Get.back();
+              // An entered URL is the user's new choice, like a quality pick:
+              // playerInit must not restore the Dolby Vision one over it.
+              _profile5Chosen = null;
               this.videoUrl = videoUrl;
               this.audioUrl = audioUrl;
               playerInit();
@@ -1787,7 +2004,7 @@ class VideoDetailController extends GetxController
       cid: cid.value,
       objectId: epId ?? aid,
       playurlType: epId != null ? 2 : 1,
-      qn: currentVideoQa.value?.code,
+      qn: _castQuality?.code,
     );
     SmartDialog.dismiss();
     if (res case Success(:final response)) {
