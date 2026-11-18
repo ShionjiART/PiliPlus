@@ -247,7 +247,8 @@ final class SystemPlayerSession: NSObject {
     return String((parts.isEmpty ? "unknown" : parts.joined(separator: " · ")).prefix(160))
   }
 
-  private static func track(_ value: Any?) -> DashTrack? {
+  /// Also used for AirPlay casting (AirPlayPlugin).
+  static func track(_ value: Any?) -> DashTrack? {
     guard let map = value as? [String: Any], let s = map["url"] as? String,
       let url = URL(string: s)
     else { return nil }

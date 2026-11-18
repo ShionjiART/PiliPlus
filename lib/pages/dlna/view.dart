@@ -29,6 +29,14 @@ class _DLNAPageState extends State<DLNAPage> {
   late final _url = Get.parameters['url']!;
   late final _title = Get.parameters['title'];
 
+  /// iOS: the quality of [_url], and where AirPlay gets the DASH stream it
+  /// casts instead (fetched anew for every cast).
+  late final _quality = Get.parameters['quality'];
+  late final _airPlayDash = switch (Get.arguments) {
+    final AirPlayDashLoader load => load,
+    _ => null,
+  };
+
   Timer? _timer;
   bool _isSearching = false;
   PermissionStatus? _permissionStatus;
@@ -152,7 +160,13 @@ class _DLNAPageState extends State<DLNAPage> {
         PlPlayerController.instance?.currentPosition ?? Duration.zero;
     _lastDevice?.pause();
     PlPlayerController.pauseIfExists();
-    AirPlayHelper.start(url: _url, title: _title, start: position);
+    AirPlayHelper.start(
+      url: _url,
+      title: _title,
+      start: position,
+      quality: _quality,
+      dash: _airPlayDash,
+    );
   }
 
   Widget _buildBody(ColorScheme colorScheme) {
@@ -234,18 +248,28 @@ class _AirPlayPanelState extends State<_AirPlayPanel> {
     final colorScheme = ColorScheme.of(context);
     final total = state.duration.inSeconds.toDouble();
     final position = _dragging ?? state.position.inSeconds.toDouble();
+    final titleStyle = TextStyle(color: colorScheme.primary);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         ListTile(
           leading: Icon(Icons.airplay, color: colorScheme.primary),
-          title: Text(
-            state.connected
-                ? '正在投放到 ${state.device ?? 'AirPlay 设备'}'
-                : '请选择 AirPlay 设备',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: colorScheme.primary),
+          title: Row(
+            children: [
+              Flexible(
+                child: Text(
+                  state.connected
+                      ? '正在投放到 ${state.device ?? 'AirPlay 设备'}'
+                      : '请选择 AirPlay 设备',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: titleStyle,
+                ),
+              ),
+              // A long device name is cut short instead of the quality.
+              if (state.quality case final quality? when state.connected)
+                Text(' · $quality', maxLines: 1, style: titleStyle),
+            ],
           ),
           subtitle: state.error != null
               ? Text('播放失败：${state.error}')

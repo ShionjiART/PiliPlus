@@ -307,31 +307,63 @@ enum SystemPlayerHLS {
     }
   }
 
+  /// `fallback` (AirPlay casting only) is a second variant, fallback.m3u8,
+  /// for receivers that cannot play `video`, or not at the bit rate they
+  /// measure. Each variant declares its own peak BANDWIDTH (Apple's HLS
+  /// authoring spec, rule 9.13), which for an HDR10 fallback is often above
+  /// that of the Dolby Vision `video`. So SCORE ranks `video` first: of the
+  /// variants a player can play and fetch fast enough, Apple's players take
+  /// the highest SCORE instead of the highest bit rate. SCORE has to be on
+  /// every variant (rule 9.19), so it is only written with a fallback. The
+  /// bilibili quality levels checked so far share their 5 s fragment
+  /// boundaries, so a receiver can also switch between the two.
   static func masterPlaylist(
     video: DashTrack, videoMedia: Media, audio: DashTrack?, audioMedia: Media?,
-    frameRate: Double?
+    frameRate: Double?, fallback: (track: DashTrack, media: Media, frameRate: Double?)? = nil
+  ) -> String {
+    var lines = ["#EXTM3U", "#EXT-X-VERSION:7", "#EXT-X-INDEPENDENT-SEGMENTS"]
+    if audioMedia != nil {
+      lines.append(
+        "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"aud\",NAME=\"audio\",DEFAULT=YES,AUTOSELECT=YES,URI=\"audio.m3u8\"")
+    }
+    lines += [
+      streamInf(
+        video: video, videoMedia: videoMedia, audio: audio, audioMedia: audioMedia,
+        frameRate: frameRate, score: fallback == nil ? nil : 2),
+      "video.m3u8",
+    ]
+    if let fallback {
+      lines += [
+        streamInf(
+          video: fallback.track, videoMedia: fallback.media, audio: audio, audioMedia: audioMedia,
+          frameRate: fallback.frameRate, score: 1),
+        "fallback.m3u8",
+      ]
+    }
+    return lines.joined(separator: "\n") + "\n"
+  }
+
+  /// The EXT-X-STREAM-INF tag of one video variant, with the audio group if
+  /// any.
+  private static func streamInf(
+    video: DashTrack, videoMedia: Media, audio: DashTrack?, audioMedia: Media?,
+    frameRate: Double?, score: Int?
   ) -> String {
     let videoInfo = videoMedia.info
     let audioInfo = audioMedia?.info
-    var lines = ["#EXTM3U", "#EXT-X-VERSION:7", "#EXT-X-INDEPENDENT-SEGMENTS"]
     let average = video.bandwidth + (audio?.bandwidth ?? 0)
     let peak = peakBitrate(videoMedia) + (audioMedia.map(peakBitrate) ?? 0)
     var attrs = ["BANDWIDTH=\(max(peak, average, 1))"]
     if average > 0 { attrs.append("AVERAGE-BANDWIDTH=\(average)") }
+    if let score { attrs.append("SCORE=\(score)") }
     let codecs = [videoInfo.codecs, audioInfo?.codecs].compactMap { $0 }
     if !codecs.isEmpty { attrs.append("CODECS=\"\(codecs.joined(separator: ","))\"") }
     if let s = videoInfo.supplementalCodecs { attrs.append("SUPPLEMENTAL-CODECS=\"\(s)\"") }
     if videoInfo.width > 0 { attrs.append("RESOLUTION=\(videoInfo.width)x\(videoInfo.height)") }
     if let frameRate, frameRate > 0 { attrs.append(String(format: "FRAME-RATE=%.3f", frameRate)) }
     attrs.append("VIDEO-RANGE=\(videoInfo.videoRange ?? "SDR")")
-    if audioInfo != nil {
-      lines.append(
-        "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"aud\",NAME=\"audio\",DEFAULT=YES,AUTOSELECT=YES,URI=\"audio.m3u8\"")
-      attrs.append("AUDIO=\"aud\"")
-    }
-    lines.append("#EXT-X-STREAM-INF:" + attrs.joined(separator: ","))
-    lines.append("video.m3u8")
-    return lines.joined(separator: "\n") + "\n"
+    if audioInfo != nil { attrs.append("AUDIO=\"aud\"") }
+    return "#EXT-X-STREAM-INF:" + attrs.joined(separator: ",")
   }
 }
 
@@ -373,7 +405,36 @@ final class SystemPlayerPlaylistLoader: NSObject, AVAssetResourceLoaderDelegate 
     AVURLAsset, SystemPlayerPlaylistLoader, video: SystemPlayerHLS.TrackInfo,
     audio: SystemPlayerHLS.TrackInfo?
   ) {
+    let (playlists, videoInfo, audioInfo) = try await makePlaylists(
+      video: video, audio: audio, frameRate: frameRate, headers: headers)
+    let loader = SystemPlayerPlaylistLoader(playlists: playlists)
+    let asset = AVURLAsset(
+      url: URL(string: "\(scheme)://playlist/master.m3u8")!,
+      options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
+    asset.resourceLoader.setDelegate(loader, queue: .main)
+    return (asset, loader, videoInfo, audioInfo)
+  }
+
+  /// The optional fallback variant of `makePlaylists` is left out unless it
+  /// loads within this many seconds; the others can take longer.
+  static let fallbackTimeout: TimeInterval = 3
+
+  /// The master, video and audio playlists for a video (+ optional audio),
+  /// keyed by file name. The master refers to the others by relative path,
+  /// and their segments are absolute CDN URLs with byte ranges. AirPlay
+  /// casting serves the same playlists over HTTP (AirPlayPlaylistServer),
+  /// plus an optional `fallback` variant (see `masterPlaylist`). That one is
+  /// loaded alongside the others and left out when it fails or takes longer
+  /// than `fallbackTimeout`.
+  static func makePlaylists(
+    video: DashTrack, audio: DashTrack?, frameRate: Double?, headers: [String: String],
+    fallback: (track: DashTrack, frameRate: Double?)? = nil
+  ) async throws -> (
+    playlists: [String: String], video: SystemPlayerHLS.TrackInfo,
+    audio: SystemPlayerHLS.TrackInfo?
+  ) {
     async let v = SystemPlayerHLS.load(video, headers: headers)
+    async let f = loadFallback(fallback?.track, headers: headers)
     var playlists: [String: String] = [:]
     var audioMedia: SystemPlayerHLS.Media?
     if let audio {
@@ -381,17 +442,37 @@ final class SystemPlayerPlaylistLoader: NSObject, AVAssetResourceLoaderDelegate 
       audioMedia = a
       playlists["audio.m3u8"] = SystemPlayerHLS.mediaPlaylist(a, url: audio.url)
     }
+    var fallbackVariant: (track: DashTrack, media: SystemPlayerHLS.Media, frameRate: Double?)?
+    // Without CODECS (e.g. encrypted) a receiver would not play it anyway.
+    if let fallback, let media = await f, media.info.codecs != nil {
+      fallbackVariant = (fallback.track, media, fallback.frameRate)
+      playlists["fallback.m3u8"] = SystemPlayerHLS.mediaPlaylist(media, url: fallback.track.url)
+    }
     let videoMedia = try await v
     playlists["video.m3u8"] = SystemPlayerHLS.mediaPlaylist(videoMedia, url: video.url)
     playlists["master.m3u8"] = SystemPlayerHLS.masterPlaylist(
       video: video, videoMedia: videoMedia, audio: audio, audioMedia: audioMedia,
-      frameRate: frameRate)
-    let loader = SystemPlayerPlaylistLoader(playlists: playlists)
-    let asset = AVURLAsset(
-      url: URL(string: "\(scheme)://playlist/master.m3u8")!,
-      options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
-    asset.resourceLoader.setDelegate(loader, queue: .main)
-    return (asset, loader, videoMedia.info, audioMedia?.info)
+      frameRate: frameRate, fallback: fallbackVariant)
+    return (playlists, videoMedia.info, audioMedia?.info)
+  }
+
+  /// `SystemPlayerHLS.load`, or nil when there is no track, when it fails, or
+  /// after `fallbackTimeout` (a slow CDN node).
+  private static func loadFallback(
+    _ track: DashTrack?, headers: [String: String]
+  ) async -> SystemPlayerHLS.Media? {
+    guard let track else { return nil }
+    return await withTaskGroup(of: SystemPlayerHLS.Media?.self) { group in
+      group.addTask { try? await SystemPlayerHLS.load(track, headers: headers) }
+      group.addTask {
+        try? await Task.sleep(nanoseconds: UInt64(fallbackTimeout * 1_000_000_000))
+        return nil
+      }
+      // Whichever ends first; the other is cancelled.
+      let first = await group.next() ?? nil
+      group.cancelAll()
+      return first
+    }
   }
 }
 
