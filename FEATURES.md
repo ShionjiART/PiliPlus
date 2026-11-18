@@ -74,7 +74,7 @@
 
 - [x] 修复 iOS 投屏一直「搜索设备失败」、不弹局域网授权（[#9](https://github.com/ShionjiART/PiliPlus/pull/9)）
 - [x] 支持 AirPlay 投屏，和现有的局域网投屏并存（[#14](https://github.com/ShionjiART/PiliPlus/pull/14)）
-- [x] AirPlay 投原画质：HDR、杜比视界和 4K 都能投，选好设备前手机不预先下载，投不出来时自动退回原来的方式（[#65](https://github.com/ShionjiART/PiliPlus/pull/65)）
+- [x] AirPlay 投原画质：4K 和 HDR 真彩都能投（杜比视界能不能投还没确认），选好设备前手机不预先下载，投不出来时自动退回原来的方式（[#65](https://github.com/ShionjiART/PiliPlus/pull/65)）
 - [x] Android 只开流量时，投屏搜索不再对运营商内网扫描（[#53](https://github.com/ShionjiART/PiliPlus/pull/53)）
 
 ## 关于和更新
