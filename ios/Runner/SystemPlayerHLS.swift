@@ -82,7 +82,9 @@ enum SystemPlayerHLS {
     var i = 0
     var initEnd = 0
     var info = TrackInfo()
-    while i + 8 <= b.count {
+    // Not `i + 8 <= b.count`: after a 64-bit box size `i` can be near
+    // Int.max, and the addition would trap.
+    while i <= b.count - 8 {
       var size = try u32(i, b.count)
       let type = String(bytes: b[(i + 4)..<(i + 8)], encoding: .ascii) ?? ""
       if size == 1 { size = try u64(i + 8, b.count) }
@@ -150,7 +152,15 @@ enum SystemPlayerHLS {
     func u32(_ i: Int) -> Int { u16(i) << 16 | u16(i + 2) }
     func hex(_ v: Int) -> String { String(v, radix: 16, uppercase: true) }
 
+    var depth = 0
     func walk(_ from: Int, _ to: Int) throws {
+      // Real init sections nest about 8 boxes deep (moov > trak > mdia >
+      // minf > stbl > stsd > sample entry > config). Deeper nesting is
+      // malformed, and unbounded recursion would overflow the stack and
+      // crash instead of throwing.
+      depth += 1
+      defer { depth -= 1 }
+      guard depth <= 16 else { throw SystemPlayerHLSError.malformed }
       var i = from
       while i + 8 <= to {
         let size = u32(i)
@@ -374,7 +384,10 @@ enum SystemPlayerHLS {
   /// to be the peak; bilibili's `bandwidth` is the average.
   static func peakBitrate(_ media: Media) -> Int {
     media.segments.reduce(0) { peak, s in
-      s.duration > 0 ? max(peak, Int(Double(s.length * 8) / s.duration)) : peak
+      // Clamped to 1 Tbit/s: a malformed sidx (a tiny duration) would make
+      // the Double too large for Int, and converting it would trap. Then the
+      // video + audio sum cannot overflow either.
+      s.duration > 0 ? max(peak, Int(min(Double(s.length * 8) / s.duration, 1e12))) : peak
     }
   }
 
