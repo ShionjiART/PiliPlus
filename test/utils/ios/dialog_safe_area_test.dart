@@ -19,9 +19,10 @@ void main() {
     FakeViewPadding padding = const FakeViewPadding(right: 84, bottom: 34),
     Widget? content,
     bool sheet = false,
+    Size size = screen,
   }) async {
     tester.view
-      ..physicalSize = screen
+      ..physicalSize = size
       ..devicePixelRatio = 1
       ..padding = padding
       ..viewPadding = padding;
@@ -65,21 +66,35 @@ void main() {
 
     final rect = dialogRect(tester);
     expect(rect.center.dx, screen.width / 2);
-    expect(rect.center.dy, screen.height / 2);
-    expect(rect.left, 40);
-    expect(rect.right, screen.width - 40);
+    // 两边都留出竖状态栏的宽度，碰不到它一端的摄像头
+    expect(rect.left, 84);
+    expect(rect.right, screen.width - 84);
   });
 
-  testWidgets('keeps a tall dialog clear of the camera at the top', (
-    tester,
-  ) async {
+  testWidgets('lets a tall dialog use the full height', (tester) async {
     IOSNativeTabBar.verticalBarHidden.value = true;
     await open(tester, contentHeight: 2000);
 
     final rect = dialogRect(tester);
-    // 上下各留出竖状态栏的宽度，再加上对话框自己的 24pt 边距
-    expect(rect.top, 84 + 24);
-    expect(rect.bottom, screen.height - 84 - 24);
+    // 只有对话框自己的 24pt 边距和底部的 Home 条
+    expect(rect.top, 24);
+    expect(rect.bottom, screen.height - 34 - 24);
+    expect(rect.right, screen.width - 84);
+  });
+
+  testWidgets('uses the full height in folded landscape', (tester) async {
+    IOSNativeTabBar.verticalBarHidden.value = true;
+    await open(
+      tester,
+      size: const Size(678, 466),
+      contentHeight: 2000,
+      padding: const FakeViewPadding(left: 84, bottom: 21),
+    );
+
+    final rect = dialogRect(tester);
+    expect(rect.top, 24);
+    expect(rect.bottom, 466 - 21 - 24);
+    expect(rect.center.dx, 678 / 2);
   });
 
   testWidgets('keeps clear of the vertical bar while it is shown', (

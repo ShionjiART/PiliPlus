@@ -205,31 +205,31 @@ abstract final class IOSNativeTabBar {
   /// 对话框的安全区，替换 [DialogRoute] 默认的 [SafeArea]（见
   /// `lib/scripts/material/dialog_safe_area.patch`）。
   ///
-  /// 竖状态栏隐藏时（视频页）页面铺满竖状态栏的位置，对话框也不再让开它，
-  /// 在整个屏幕里水平居中。摄像头在竖状态栏的一端，所以上下各留出竖状态栏的
-  /// 宽度（至少和原来的安全区一样），两边相同，垂直方向也保持居中
+  /// 竖状态栏隐藏时（视频页）页面铺满竖状态栏的位置，对话框也不再偏向一侧，
+  /// 在整个屏幕里水平居中。摄像头在竖状态栏的一端，所以对话框左右两边都至少
+  /// 留出竖状态栏的宽度，碰不到摄像头；上下只让开顶部和底部的安全区，高度和
+  /// 展开竖屏时一样铺满。横屏时对话框比屏幕窄得多，两边的边距本来就够
   static Widget dialogSafeArea(BuildContext context, Widget dialog) =>
       ValueListenableBuilder<bool>(
         valueListenable: verticalBarHidden,
         builder: (context, hidden, dialog) {
           if (!hidden) return SafeArea(child: dialog!);
           final padding = MediaQuery.paddingOf(context);
-          final vertical = [
-            padding.top,
-            padding.bottom,
-            padding.left,
-            padding.right,
-          ].reduce(max);
+          // 对话框自己还会在左右各留 [_dialogSideInset]
+          final side = max(padding.left, padding.right) - _dialogSideInset;
           return removeSideInsets(
             context,
             SafeArea(
-              minimum: EdgeInsets.symmetric(vertical: vertical),
+              minimum: EdgeInsets.symmetric(horizontal: max(0.0, side)),
               child: dialog!,
             ),
           );
         },
         child: dialog,
       );
+
+  /// [Dialog] 默认的左右边距（`insetPadding`）
+  static const _dialogSideInset = 40.0;
 
   /// 状态栏在竖状态栏中时（iPhone Duo）隐藏状态栏，让页面铺满竖状态栏的位置。
   /// 状态栏在顶部时不生效，此时用 [statusBar] 隐藏顶部的状态栏（iPhone Duo
