@@ -19,7 +19,7 @@
 
 - 打出来给人用的安装包，打一个标签并发布 Release，标签名为 `duo-<上游版本号>-<序号>`，例如 `duo-2.2.0-1`。同一个上游版本每发一次序号加一，上游升级版本后从 1 重新开始。之前发布的 `iphone-duo-v1`、`iphone-duo-v2` 保持原名。
 - 安装包文件名为 `PiliPlus_ios_<标签>_<日期>_<9 位提交号>_unsigned.ipa`，例如 `PiliPlus_ios_duo-2.2.0-2_20261115_835223c8e_unsigned.ipa`；同时附上同名的 `.sha256` 校验文件。文件名里的 `ios` 和提交号不能省：App 的「检查更新」靠 `ios` 找到 iOS 安装包，靠提交号判断已经装的是不是这一版。
-- 发布、编辑或删除 Release 后，`AltStore Source` 工作流（`.github/workflows/altstore.yml`）会重新生成 AltStore / SideStore 源，部署到 `https://shionjiart.github.io/PiliPlus/altstore.json`。版本号、构建号和权限都从各个 Release 的安装包里读，不用手改；预发布（pre-release）不会进源。替换 Release 里的安装包不会触发它，替换后要手动运行一次 `gh workflow run altstore.yml --repo ShionjiArt/PiliPlus`，否则源里的大小和构建号对不上，AltStore 会拒绝安装。
+- 发布、编辑或删除 Release 后，`AltStore Source` 工作流（`.github/workflows/altstore.yml`）会重新生成 AltStore / SideStore 源，部署到 `https://shionjiart.github.io/PiliPlus/altstore.json`。版本号、构建号和权限都从各个 Release 的安装包里读，不用手改；预发布（pre-release）不会进源。替换 Release 里的安装包不会触发 Release 事件，由每小时一次的检查发现后自动更新，最多晚一小时；急着用可以手动运行 `gh workflow run altstore.yml --repo ShionjiArt/PiliPlus`。`release` 分支上改了源的脚本、工作流或图标后，也会自动重新部署。
 - 没有合并就放弃、但想留着的分支，删除前先打标签 `archive/分支名`，否则它的提交会丢失。
 - fork 时从上游复制来了约 150 个标签。自己的标签统一用 `iphone-duo-`、`duo-`、`archive/` 开头，以便区分。
 
