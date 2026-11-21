@@ -1,19 +1,31 @@
 name: AltStore Source
 
-# 发布、编辑或删除 Release 后，重新生成 AltStore / SideStore 源并部署到 GitHub Pages：
+# 重新生成 AltStore / SideStore 源并部署到 GitHub Pages：
 # https://shionjiart.github.io/PiliPlus/altstore.json
-# 替换 Release 里的安装包不会触发 Release 事件，替换后要手动运行一次：
-#   gh workflow run altstore.yml --repo ShionjiArt/PiliPlus
+# - 发布、编辑或删除 Release 后马上更新。
+# - release 分支上改了源的脚本、本工作流或图标后马上更新。
+# - 每小时检查一次：替换 Release 里的安装包不会触发 Release 事件，
+#   靠这里发现。Releases 和线上部署时一样就直接结束，不下载也不部署。
+# 想立刻更新也可以手动运行：gh workflow run altstore.yml --repo ShionjiArt/PiliPlus
 on:
   release:
     types: [published, edited, deleted]
+  push:
+    branches: [release]
+    paths:
+      - .github/altstore/**
+      - .github/workflows/altstore.yml
+      - ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png
+  schedule:
+    - cron: "17 * * * *"
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# Release 事件只负责转发，单独一组；其余的共用一组，避免同时部署。
 concurrency:
-  group: altstore-${{ github.event_name }}
+  group: altstore-${{ github.event_name == 'release' && 'release' || 'pages' }}
   cancel-in-progress: false
 
 jobs:
@@ -32,9 +44,37 @@ jobs:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: gh workflow run altstore.yml --repo "$GITHUB_REPOSITORY" --ref "$DEFAULT_BRANCH"
 
+  # 定时运行时先比较指纹（只查 Releases 接口），有变化才生成和部署。
+  check:
+    name: Check for changes
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.compare.outputs.changed }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v6
+
+      - name: Compare with deployed source
+        id: compare
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          BASE_URL: ${{ steps.pages.outputs.base_url }}
+        run: |
+          changed=$(python3 .github/altstore/build_source.py --base-url "$BASE_URL" --changed-since-deploy)
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+          echo "有变化：$changed"
+
   build:
     name: Build source
-    if: github.event_name == 'workflow_dispatch'
+    needs: check
+    if: >-
+      !cancelled() && github.event_name != 'release' &&
+      (needs.check.result == 'skipped' || needs.check.outputs.changed == 'true')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -59,6 +99,8 @@ jobs:
   deploy:
     name: Deploy to Pages
     needs: build
+    # check 被跳过时，默认条件会连带跳过这里，所以明确只看 build 的结果。
+    if: ${{ !cancelled() && needs.build.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       pages: write

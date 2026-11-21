@@ -6,6 +6,8 @@
 会核对这些信息，和安装包不一致就拒绝安装，所以不手写，每次都从安装包里读。
 
 由 .github/workflows/altstore.yml 在发布 Release 后运行，部署到 GitHub Pages。
+工作流每小时还会用 --changed-since-deploy 检查一次：Releases 或本脚本和线上部署时
+不一样（例如替换了安装包，这不会触发 Release 事件），才重新生成和部署。
 也可以在本机运行，检查生成的结果（只用到 Python 标准库）：
 
     python3 .github/altstore/build_source.py --repo ShionjiArt/PiliPlus --out logs/altstore
@@ -14,6 +16,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import html
 import json
 import os
@@ -23,6 +26,8 @@ import shutil
 import struct
 import sys
 import tempfile
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 import zipfile
@@ -173,10 +178,59 @@ def inspect_ipa(path: Path) -> IpaInfo:
 
 # ---------------------------------------------------------------- 生成
 
-def collect_versions(repo: str, token: str | None, cache: Path) -> list[tuple[dict, dict, IpaInfo]]:
+def fingerprint(releases: list[dict]) -> str:
+    """只用 Releases 接口的信息算出指纹，不下载安装包。
+
+    包含会影响源内容的字段：替换安装包会改变它的编号、大小和更新时间；
+    脚本和图标也算在内，改了它们同样需要重新部署。不含下载次数这类一直在变的字段。
+    """
+    items = []
+    for release in releases:
+        if release["draft"]:
+            continue
+        items.append({
+            "tag": release["tag_name"],
+            "name": release["name"],
+            "body": release.get("body"),
+            "published_at": release["published_at"],
+            "prerelease": release["prerelease"],
+            "ipas": sorted(
+                [a["id"], a["name"], a["size"], a["updated_at"], a["browser_download_url"]]
+                for a in release["assets"]
+                if a["name"].endswith(".ipa")
+            ),
+        })
+    items.sort(key=lambda item: item["tag"])
+    digest = hashlib.sha256(json.dumps(items, ensure_ascii=False, sort_keys=True).encode())
+    digest.update(Path(__file__).read_bytes())
+    digest.update(ICON.read_bytes())
+    return digest.hexdigest()
+
+
+def deployed_fingerprint(base_url: str) -> str | None:
+    """读线上部署时记下的指纹；读不到时返回 None，按有变化处理（多部署一次没有坏处）。"""
+    for attempt in range(3):
+        if attempt:
+            time.sleep(5)
+        # 加上时间参数，绕过 Pages 的缓存。
+        url = f"{base_url}fingerprint.txt?t={time.time():.0f}"
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": USER_AGENT})) as resp:
+                return resp.read().decode().strip()
+        except urllib.error.HTTPError as err:
+            if err.code == 404:
+                return None
+            # Pages 偶尔对文件返回 503，重试几次就好。
+            print(f"读取线上指纹失败：HTTP {err.code}", file=sys.stderr)
+        except urllib.error.URLError as err:
+            print(f"读取线上指纹失败：{err.reason}", file=sys.stderr)
+    return None
+
+
+def collect_versions(releases: list[dict], cache: Path) -> list[tuple[dict, dict, IpaInfo]]:
     """返回 (release, asset, IpaInfo)，新版本在前。跳过草稿、预发布和没有安装包的 Release。"""
     found = []
-    for release in list_releases(repo, token):
+    for release in releases:
         if release["draft"] or release["prerelease"]:
             continue
         ipas = [a for a in release["assets"] if a["name"].endswith(".ipa")]
@@ -305,11 +359,18 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY"), help="owner/name")
     parser.add_argument("--base-url", help="网页的根地址，默认 https://<owner>.github.io/<name>/")
-    parser.add_argument("--out", type=Path, required=True, help="输出目录")
+    parser.add_argument("--out", type=Path, help="输出目录")
     parser.add_argument("--cache-dir", type=Path, help="缓存下载的安装包，默认用临时目录")
+    parser.add_argument(
+        "--changed-since-deploy",
+        action="store_true",
+        help="不生成，只比较指纹：和线上部署的不一样时输出 true，否则输出 false",
+    )
     args = parser.parse_args()
     if not args.repo:
         parser.error("需要 --repo 或环境变量 GITHUB_REPOSITORY")
+    if not args.out and not args.changed_since_deploy:
+        parser.error("需要 --out 或 --changed-since-deploy")
 
     owner, name = args.repo.split("/")
     base_url = args.base_url or f"https://{owner.lower()}.github.io/{name}/"
@@ -317,10 +378,18 @@ def main() -> int:
         base_url += "/"
     token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
 
+    releases = list_releases(args.repo, token)
+    current = fingerprint(releases)
+    if args.changed_since_deploy:
+        deployed = deployed_fingerprint(base_url)
+        print(f"当前指纹 {current}，线上指纹 {deployed}", file=sys.stderr)
+        print("true" if current != deployed else "false")
+        return 0
+
     with tempfile.TemporaryDirectory() as tmp:
         cache = args.cache_dir or Path(tmp)
         cache.mkdir(parents=True, exist_ok=True)
-        versions = collect_versions(args.repo, token, cache)
+        versions = collect_versions(releases, cache)
     if not versions:
         print("没有找到带 .ipa 的 Release，不生成源", file=sys.stderr)
         return 1
@@ -331,6 +400,7 @@ def main() -> int:
     (args.out / "altstore.json").write_text(json.dumps(source, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (args.out / "index.html").write_text(build_page(args.repo, source_url, source), encoding="utf-8")
     shutil.copyfile(ICON, args.out / "icon.png")
+    (args.out / "fingerprint.txt").write_text(current + "\n", encoding="utf-8")
 
     for v in source["apps"][0]["versions"]:
         print(f"{v['marketingVersion']}: {v['version']} ({v['buildVersion']}), {v['size']} 字节")
