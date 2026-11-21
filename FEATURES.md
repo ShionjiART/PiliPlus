@@ -81,7 +81,7 @@
 
 - [x] 关于页的源码、提交、问题反馈链接和检查更新改用本仓库：不再提示下载没有 iPhone Duo 适配的原版安装包；刚装上的版本也不会被当成有新版本（[#44](https://github.com/ShionjiART/PiliPlus/pull/44)）
 - [x] iOS 检查更新只打开安装包，不会打开同名的 .sha256 校验文件；没有当前平台的安装包时不提示更新（[#53](https://github.com/ShionjiART/PiliPlus/pull/53)）
-- [x] iOS 版可以从 AltStore 或 SideStore 安装和更新：在 iPhone 上打开 <https://shionjiart.github.io/PiliPlus/>，点「添加到 AltStore」或「添加到 SideStore」，也可以手动添加源 `https://shionjiart.github.io/PiliPlus/altstore.json`。每次发布新版本后源会自动更新（[#68](https://github.com/ShionjiART/PiliPlus/pull/68)）
+- [x] iOS 版可以从 AltStore 或 SideStore 安装和更新：在 iPhone 上打开 <https://shionjiart.github.io/PiliPlus/>，点「添加到 AltStore」或「添加到 SideStore」，也可以手动添加源 `https://shionjiart.github.io/PiliPlus/altstore.json`。每次发布新版本后源会自动更新（[#68](https://github.com/ShionjiART/PiliPlus/pull/68)）。源和 App 在 AltStore 里显示为「PiliPlus (sssakuya)」，和原版区分开（[#69](https://github.com/ShionjiART/PiliPlus/pull/69)）
 
 ## 已知问题
 
