@@ -34,18 +34,23 @@ ICON = REPO_ROOT / "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x
 
 TINT_COLOR = "5CB67B"  # 图标的绿色
 
-SOURCE_NAME = "PiliPlus Duo"
-SOURCE_SUBTITLE = "PiliPlus 的 iPhone Duo 适配版"
-SOURCE_DESCRIPTION = "PiliPlus iPhone Duo 适配版的安装源。每次在 GitHub 发布新版本后自动更新。"
+# 名字里带上维护者，在 AltStore 里和原版 PiliPlus 区分开。
+SOURCE_NAME = "PiliPlus (sssakuya)"
+SOURCE_SUBTITLE = "sssakuya 个人维护版，适配 iPhone Duo"
+SOURCE_DESCRIPTION = (
+    "sssakuya 个人维护的 PiliPlus（加入了 iPhone Duo 适配）的安装源，不是原版 PiliPlus 的源。"
+    "每次在 GitHub 发布新版本后自动更新。"
+)
 
-APP_NAME = "PiliPlus"
+APP_NAME = "PiliPlus (sssakuya)"
 APP_DEVELOPER = "sssakuya"
-APP_SUBTITLE = "BiliBili 第三方客户端，适配 iPhone Duo"
+APP_SUBTITLE = "sssakuya 个人维护版，适配 iPhone Duo"
 APP_CATEGORY = "entertainment"
 APP_DESCRIPTION = """\
-PiliPlus 是用 Flutter 开发的 BiliBili 第三方客户端，原作者 bggRGjQaUbCoE。
+这是 sssakuya 个人维护的 PiliPlus，不是原版。PiliPlus 是用 Flutter 开发的 BiliBili 第三方客户端，\
+原作者 bggRGjQaUbCoE。
 
-这是加入 iPhone Duo（折叠屏 iPhone）适配的个人维护版：合上和展开时自动切换布局，\
+这个维护版加入了 iPhone Duo（折叠屏 iPhone）适配：合上和展开时自动切换布局，\
 首页的标签栏放进竖状态栏，页面、播放器和直播间都避开竖状态栏。另外还改进了系统播放器\
 播放 HDR 和杜比视界、AirPlay 投原画质等。
 
@@ -273,7 +278,7 @@ def build_page(repo: str, source_url: str, source: dict) -> str:
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PiliPlus Duo 安装源</title>
+<title>{e(SOURCE_NAME)} 安装源</title>
 <style>
   :root {{ color-scheme: light dark; --tint: #{TINT_COLOR}; }}
   body {{ font: 16px/1.6 -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
