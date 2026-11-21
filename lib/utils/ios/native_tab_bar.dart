@@ -12,7 +12,7 @@ import 'package:PiliPlus/utils/ios/native_tab_tools.dart';
 import 'package:PiliPlus/utils/ios/vertical_bar_owner.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// iOS 26+ iPhone 上用系统液态玻璃标签栏作为主导航（见 ios/Runner/SceneDelegate.swift）。
 ///
@@ -172,6 +172,36 @@ abstract final class IOSNativeTabBar {
   /// 铺满竖状态栏的位置，不再按它的安全区在一侧留出空白
   static bool get sheetUseSafeArea => !verticalBarHidden.value;
 
+  /// 去掉 [child] 看到的左右安全区。
+  ///
+  /// 弹窗不让开左右安全区时（竖状态栏隐藏），安全区仍留在 MediaQuery 里，
+  /// 弹窗里的 [ListTile]、[SafeArea] 等会自己再让开一次，内容整体偏向一侧。
+  /// 已经让开时左右安全区本来就是 0，去掉也没有影响
+  static Widget removeSideInsets(BuildContext context, Widget child) =>
+      MediaQuery.removePadding(
+        context: context,
+        removeLeft: true,
+        removeRight: true,
+        child: child,
+      );
+
+  /// [showModalBottomSheet]，`useSafeArea` 用 [sheetUseSafeArea]，弹窗内容看到的
+  /// 左右安全区和弹窗自己让开的一致（见 [removeSideInsets]）
+  static Future<T?> showSheet<T>({
+    required BuildContext context,
+    required WidgetBuilder builder,
+    bool isScrollControlled = false,
+    bool enableDrag = true,
+    BoxConstraints? constraints,
+  }) => showModalBottomSheet<T>(
+    context: context,
+    useSafeArea: sheetUseSafeArea,
+    isScrollControlled: isScrollControlled,
+    enableDrag: enableDrag,
+    constraints: constraints,
+    builder: (context) => removeSideInsets(context, Builder(builder: builder)),
+  );
+
   /// 对话框的安全区，替换 [DialogRoute] 默认的 [SafeArea]（见
   /// `lib/scripts/material/dialog_safe_area.patch`）。
   ///
@@ -190,11 +220,12 @@ abstract final class IOSNativeTabBar {
             padding.left,
             padding.right,
           ].reduce(max);
-          return SafeArea(
-            left: false,
-            right: false,
-            minimum: EdgeInsets.symmetric(vertical: vertical),
-            child: dialog!,
+          return removeSideInsets(
+            context,
+            SafeArea(
+              minimum: EdgeInsets.symmetric(vertical: vertical),
+              child: dialog!,
+            ),
           );
         },
         child: dialog,

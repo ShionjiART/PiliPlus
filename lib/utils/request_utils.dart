@@ -192,9 +192,8 @@ abstract final class RequestUtils {
               DialogOption(
                 onPressed: () async {
                   Get.back();
-                  final result = await showModalBottomSheet<Set<int>>(
+                  final result = await IOSNativeTabBar.showSheet<Set<int>>(
                     context: context,
-                    useSafeArea: IOSNativeTabBar.sheetUseSafeArea,
                     isScrollControlled: true,
                     constraints: BoxConstraints(
                       maxWidth: min(640, MediaQuery.shortestSideOf(context)),

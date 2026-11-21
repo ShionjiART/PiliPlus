@@ -17,6 +17,8 @@ void main() {
     WidgetTester tester, {
     double contentHeight = 100,
     FakeViewPadding padding = const FakeViewPadding(right: 84, bottom: 34),
+    Widget? content,
+    bool sheet = false,
   }) async {
     tester.view
       ..physicalSize = screen
@@ -28,13 +30,20 @@ void main() {
       MaterialApp(
         home: Builder(
           builder: (context) => TextButton(
-            onPressed: () => showDialog<void>(
-              context: context,
-              builder: (_) => AlertDialog(
-                title: const Text('播放信息'),
-                content: SizedBox(height: contentHeight, width: 1000),
-              ),
-            ),
+            onPressed: () => sheet
+                ? IOSNativeTabBar.showSheet<void>(
+                    context: context,
+                    builder: (_) => content!,
+                  )
+                : showDialog<void>(
+                    context: context,
+                    builder: (_) => AlertDialog(
+                      title: const Text('播放信息'),
+                      content:
+                          content ??
+                          SizedBox(height: contentHeight, width: 1000),
+                    ),
+                  ),
             child: const Text('open'),
           ),
         ),
@@ -103,5 +112,51 @@ void main() {
     expect(rect.right, screen.width - 40);
     // 和 Flutter 默认的 SafeArea 一样，在上下安全区之间居中
     expect(rect.center.dy, (62 + screen.height - 34) / 2);
+  });
+
+  // 合上横屏：竖状态栏在左边
+  const landscapeBar = FakeViewPadding(left: 84, bottom: 21);
+
+  /// 文字离 ListTile 左边的距离：竖状态栏的安全区留在 MediaQuery 里时，
+  /// ListTile 会再让开一次，变成 16 + 84
+  double textInset(WidgetTester tester) =>
+      tester.getTopLeft(find.text('Player')).dx -
+      tester.getTopLeft(find.byType(ListTile)).dx;
+
+  const tile = SizedBox(
+    width: 300,
+    child: ListTile(title: Text('Player')),
+  );
+
+  testWidgets('list tiles in a dialog do not move right of the hidden bar', (
+    tester,
+  ) async {
+    IOSNativeTabBar.verticalBarHidden.value = true;
+    await open(tester, padding: landscapeBar, content: tile);
+
+    expect(textInset(tester), 16);
+    // 对话框内容的 24pt 加 ListTile 的 16pt
+    expect(
+      tester.getTopLeft(find.text('Player')).dx - dialogRect(tester).left,
+      40,
+    );
+  });
+
+  testWidgets('list tiles in a sheet do not move right of the hidden bar', (
+    tester,
+  ) async {
+    IOSNativeTabBar.verticalBarHidden.value = true;
+    await open(tester, padding: landscapeBar, content: tile, sheet: true);
+
+    expect(textInset(tester), 16);
+  });
+
+  testWidgets('a sheet still keeps clear of the bar while it is shown', (
+    tester,
+  ) async {
+    await open(tester, padding: landscapeBar, content: tile, sheet: true);
+
+    expect(tester.getRect(find.byType(BottomSheet)).left, 84);
+    expect(textInset(tester), 16);
   });
 }

@@ -97,13 +97,12 @@ abstract final class PageUtils {
     }
 
     if (context.mounted) {
-      showModalBottomSheet(
+      IOSNativeTabBar.showSheet(
         context: context,
         builder: (context) => SharePanel(
           content: content,
           userList: userList,
         ),
-        useSafeArea: IOSNativeTabBar.sheetUseSafeArea,
         enableDrag: false,
         isScrollControlled: true,
       );
@@ -155,9 +154,8 @@ abstract final class PageUtils {
     required BuildContext context,
     required FavMixin ctr,
   }) {
-    showModalBottomSheet(
+    IOSNativeTabBar.showSheet(
       context: context,
-      useSafeArea: IOSNativeTabBar.sheetUseSafeArea,
       isScrollControlled: true,
       constraints: BoxConstraints(
         maxWidth: min(640, MediaQuery.shortestSideOf(context)),
@@ -474,11 +472,12 @@ abstract final class PageUtils {
           // 竖状态栏隐藏时（iPhone Duo 视频页）左右铺满，和页面内容一致
           return ValueListenableBuilder(
             valueListenable: IOSNativeTabBar.verticalBarHidden,
-            builder: (context, verticalBarHidden, child) => SafeArea(
-              left: !verticalBarHidden,
-              right: !verticalBarHidden,
-              child: child!,
-            ),
+            builder: (context, verticalBarHidden, child) => verticalBarHidden
+                ? IOSNativeTabBar.removeSideInsets(
+                    context,
+                    SafeArea(child: child!),
+                  )
+                : SafeArea(child: child!),
             child: CustomFractionallySizedBox(
               maxWidth: maxWidth,
               widthFactor: isPortrait ? 1.0 : 0.5,

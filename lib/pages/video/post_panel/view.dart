@@ -153,9 +153,8 @@ class PostPanel extends CommonSlidePage {
                     ),
                   );
                 } else {
-                  res = await showModalBottomSheet<String>(
+                  res = await IOSNativeTabBar.showSheet<String>(
                     context: context,
-                    useSafeArea: IOSNativeTabBar.sheetUseSafeArea,
                     isScrollControlled: true,
                     constraints: const BoxConstraints(maxWidth: 450),
                     builder: (context) {

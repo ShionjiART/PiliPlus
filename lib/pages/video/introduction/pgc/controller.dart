@@ -189,10 +189,9 @@ class PgcIntroController extends CommonIntroController {
               onPressed: () {
                 Get.back();
                 final item = findEpisode(cid.value);
-                showModalBottomSheet(
+                IOSNativeTabBar.showSheet(
                   context: context,
                   isScrollControlled: true,
-                  useSafeArea: IOSNativeTabBar.sheetUseSafeArea,
                   builder: (context) => RepostPanel(
                     rid: epId,
                     /*
