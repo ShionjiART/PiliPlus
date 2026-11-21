@@ -1,0 +1,72 @@
+name: AltStore Source
+
+# 发布、编辑或删除 Release 后，重新生成 AltStore / SideStore 源并部署到 GitHub Pages：
+# https://shionjiart.github.io/PiliPlus/altstore.json
+# 替换 Release 里的安装包不会触发 Release 事件，替换后要手动运行一次：
+#   gh workflow run altstore.yml --repo ShionjiArt/PiliPlus
+on:
+  release:
+    types: [published, edited, deleted]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: altstore-${{ github.event_name }}
+  cancel-in-progress: false
+
+jobs:
+  # Pages 默认只允许从默认分支部署，而 Release 事件跑在标签上，
+  # 所以这里只在 release 分支上重新触发本工作流，由那次运行生成和部署。
+  redispatch:
+    name: Trigger on release branch
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Run workflow on default branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: gh workflow run altstore.yml --repo "$GITHUB_REPOSITORY" --ref "$DEFAULT_BRANCH"
+
+  build:
+    name: Build source
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v6
+
+      # 安装包从 Releases 下载，版本号、构建号和权限都从安装包里读。
+      - name: Generate source
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          BASE_URL: ${{ steps.pages.outputs.base_url }}
+        run: python3 .github/altstore/build_source.py --base-url "$BASE_URL" --out _site
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  deploy:
+    name: Deploy to Pages
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}altstore.json
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v5
