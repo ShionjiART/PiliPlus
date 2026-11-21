@@ -32,7 +32,7 @@
 - [x] 修复开启「改用侧边栏」后首页搜索栏和头像消失：iOS 26 起的 iPhone 由系统标签栏负责导航，这个设置不再生效并在设置里置灰（普通 iPhone 也适用）（[#19](https://github.com/ShionjiART/PiliPlus/pull/19)）
 - [x] 合上时二级页面在竖状态栏显示返回键；首页等一级页面和视频页不显示，弹窗不影响（[#21](https://github.com/ShionjiART/PiliPlus/pull/21)）。页面左上角的返回键起初保留，后来去掉（[#28](https://github.com/ShionjiART/PiliPlus/pull/28)）
 - [x] 一级页面的竖状态栏顶部放头像，以及搜索和私信的组合按钮，私信带未读角标；未登录时不显示私信，头像点了去登录；首页顶部的头像在 Duo 上去掉（[#22](https://github.com/ShionjiART/PiliPlus/pull/22)）
-- [x] 视频页的底部弹窗（长按评论的菜单、分享、收藏、缓存、转发、播放器设置等）和页面一样铺满竖状态栏的位置，右边不再留出一条（[#25](https://github.com/ShionjiART/PiliPlus/pull/25)）
+- [x] 视频页的底部弹窗（长按评论的菜单、分享、收藏、缓存、转发、播放器设置等）和页面一样铺满竖状态栏的位置，右边不再留出一条（[#25](https://github.com/ShionjiART/PiliPlus/pull/25)）。后来修复横屏时播放器设置面板、播放信息等弹窗和对话框里的列表整体右移一截：竖状态栏的安全区不再传给弹窗里的内容（[#67](https://github.com/ShionjiART/PiliPlus/pull/67)）
 - [x] 动态详情页的点赞、评论、分享、转发放进竖状态栏，带简短的数量（1.2万、1千万、1.2亿）；发评论单独一个按钮放在最下面，代替页面上的悬浮按钮；底部操作栏保留（[#26](https://github.com/ShionjiART/PiliPlus/pull/26)）。后来顺序改为点赞、评论、转发（带数量）、分享（只有图标），按钮变矮，通话时也不会被收进 ⋯ 菜单（[#33](https://github.com/ShionjiART/PiliPlus/pull/33)）
 - [x] Duo 上首页顶部的搜索栏、消息按钮和头像那一行去掉（都已在竖状态栏里），分区标签移到最上面（[#27](https://github.com/ShionjiART/PiliPlus/pull/27)）
 - [x] 展开竖屏时首页的头像、搜索栏和消息按钮放进顶部状态栏那一行（右边让开时间和 Wi-Fi），和 B 站官方客户端一样；往上滑时这一行连同状态栏一起收起，分区标签移到最上面，往下滑再出现（[#52](https://github.com/ShionjiART/PiliPlus/pull/52)）。后来这一行的位置和给时间、Wi-Fi 让出的宽度改用系统给的值，并修复合上时启动、展开后首页仍是旧样式（[#58](https://github.com/ShionjiART/PiliPlus/pull/58)）。#52 曾让直板 iPhone 首页上滑时顶栏画进灵动岛，已修复（[#60](https://github.com/ShionjiART/PiliPlus/pull/60)）。上下滑动时搜索栏一卡一卡、往回跳的问题也已修复：状态栏收起时不再让整个页面重新排版（[#62](https://github.com/ShionjiART/PiliPlus/pull/62)）

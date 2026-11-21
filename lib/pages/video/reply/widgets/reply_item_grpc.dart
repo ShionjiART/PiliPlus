@@ -448,9 +448,8 @@ class ReplyItemGrpc extends StatelessWidget {
   static bool enableWordRe = Pref.enableWordRe;
   static int? replyLengthLimit = Pref.replyLengthLimit;
 
-  void _showMore(BuildContext context) => showModalBottomSheet(
+  void _showMore(BuildContext context) => IOSNativeTabBar.showSheet(
     context: context,
-    useSafeArea: IOSNativeTabBar.sheetUseSafeArea,
     isScrollControlled: true,
     constraints: BoxConstraints(
       maxWidth: min(640, MediaQuery.shortestSideOf(context)),
@@ -883,9 +882,8 @@ class ReplyItemGrpc extends StatelessWidget {
   }) {
     final (padding, borderRadius) = _subReplyDecoration(index, length);
 
-    void showMore() => showModalBottomSheet(
+    void showMore() => IOSNativeTabBar.showSheet(
       context: context,
-      useSafeArea: IOSNativeTabBar.sheetUseSafeArea,
       isScrollControlled: true,
       constraints: BoxConstraints(
         maxWidth: min(640, MediaQuery.shortestSideOf(context)),

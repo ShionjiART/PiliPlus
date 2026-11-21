@@ -1904,9 +1904,8 @@ class VideoDetailController extends GetxController
       final targetCid = isUgc ? ugcIntroCtr.seasonCid ?? cid.value : cid.value;
       final index = episodes.indexWhere((e) => e.cid == targetCid);
 
-      showModalBottomSheet(
+      IOSNativeTabBar.showSheet(
         context: context,
-        useSafeArea: IOSNativeTabBar.sheetUseSafeArea,
         isScrollControlled: true,
         constraints: BoxConstraints(
           maxWidth: min(640, MediaQuery.shortestSideOf(context)),

@@ -401,10 +401,9 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
               ),
               onTap: () {
                 Get.back();
-                showModalBottomSheet(
+                IOSNativeTabBar.showSheet(
                   context: context,
                   isScrollControlled: true,
-                  useSafeArea: IOSNativeTabBar.sheetUseSafeArea,
                   builder: (context) => RepostPanel(
                     rid: videoDetail.aid,
                     dynType: 8,
