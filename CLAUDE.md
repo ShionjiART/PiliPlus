@@ -30,6 +30,7 @@
 3. 改完后跑 `flutter analyze` 和相关测试。涉及界面的改动，在 iPhone Duo 模拟器上检查合上、展开和旋转；并行时每个任务新建自己的模拟器，不要共用。
 4. 在本仓库开 PR 合并到 `release`，说明改了什么、为什么改、怎么测的。用户能感受到的功能和修复，在同一个 PR 里更新 [`FEATURES.md`](FEATURES.md)：新增一条或把对应的条目打勾，并附上 PR 链接。
 5. 用 merge commit 合并，不用 squash。合并后删除分支（本地和 GitHub 上都删）；改动记录保留在 PR 页面，需要时可以从 PR 页面恢复分支。还要用的分支先保留，例如准备提给上游的分支。
+6. 合并的 PR 改到了 App 本身（会改变安装包内容的，例如 `lib/`、`ios/`、`assets/`、`pubspec.yaml`，同步上游也算），合并后接着按下面「发布安装包」打包并发布新的 Release，不用再单独询问作者。这样 AltStore 源和 App 的「检查更新」都能收到新版本。只改文档、CI 或 AltStore 源的不发。接连合并好几个 PR 时，在最后一个合并后发一次即可。
 
 ## 提交
 
@@ -59,6 +60,22 @@
 - 上游升级 Flutter 版本后，把单独的 SDK 切到新版本，再重新应用补丁。
 - 在干净的构建目录里编译模拟器时，`flutter build ios --config-only` 可能要跑两次：第一次可能会在 `ios/Flutter/Generated.xcconfig` 里写入 `EXCLUDED_ARCHS[sdk=iphonesimulator*]=i386 arm64`，导致 arm64 模拟器编译失败。
 - `macos/Flutter/` 下的 `.xcconfig` 会在编译时被自动修改，不要提交。
+
+## 发布安装包
+
+合并改到 App 本身的 PR 后发布（见「每个改动的流程」第 6 步）：
+
+1. 定标签和标题：用 `gh release list --repo ShionjiArt/PiliPlus` 和 `git ls-remote --tags fork 'duo-*'` 查已有的版本，序号接着最大的加一（规则见「标签」）；标题为「iPhone Duo 适配 v<N>」，N 接着上一个 Release 加一。别的会话可能刚发过，以 GitHub 上的为准。
+2. 从最新的 `fork/release` 新建一个 detached worktree `.claude/worktrees/ipa-<标签>`，在里面打包，日志写到 `logs/`：
+   - 加载打过补丁的 SDK 和 pub 缓存（作者本机：`source ~/development/piliplus-env.sh`，见「构建」）。
+   - 和 CI 一样给项目打 iOS 补丁：`git apply lib/scripts/bottom_sheet_ios_piliplus.patch lib/scripts/geetest_ios.patch`。
+   - 照 `lib/scripts/build.ps1` 定版本：把 `pubspec.yaml` 的 `version` 改成 `<版本号>+<git rev-list --count HEAD 的结果>`，并写出 `pili_release.json`（`pili.name`、`pili.code`、`pili.hash`、`pili.time`）。
+   - `flutter build ios --release --no-codesign --dart-define-from-file=pili_release.json`
+   - 照 `.github/workflows/ios.yml` 里的命令，给 `Runner.app/Frameworks` 下的每个 `.framework` 做 ad-hoc 签名，再把 `Payload/Runner.app` 打成 zip。按「标签」里的规则命名，并生成同名的 `.sha256`。
+3. 打带注释的标签（作者 sssakuya）推到本仓库，用 `gh release create` 发布，附上 `.ipa` 和 `.sha256`，标为最新。说明用中文，写清基于哪个提交、包含哪些 PR、用户能感受到的变化和已知问题，格式参考上一个 Release。
+4. 发布后 AltStore 源会自动更新。确认线上 `altstore.json` 里出现了新版本，版本号和构建号与安装包一致，然后删除打包用的 worktree。
+
+合并前给作者在真机上试的测试包不发 Release：文件名用 `PiliPlus_ios_test-<名字>_<日期>_<9 位提交号>_unsigned.ipa`，放在 `~/Downloads`。
 
 ## 进度
 
